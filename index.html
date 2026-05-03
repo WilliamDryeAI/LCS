@@ -648,6 +648,13 @@ class GameScene extends Phaser.Scene {
 
   // ─── SHOOTING ────────────────────────────────────────
 
+  pointInWall(px, py) {
+    return this.walls.getChildren().some(w => {
+      const b = w.body;
+      return px >= b.x && px <= b.x + b.width && py >= b.y && py <= b.y + b.height;
+    });
+  }
+
   shootPlayer(x, y, dx, dy) {
     const { atk, dmg, id } = this.ch;
     const baseAng = Math.atan2(dy, dx);
@@ -655,7 +662,10 @@ class GameScene extends Phaser.Scene {
 
     atk.angles.forEach(offset => {
       const ang = baseAng + offset;
-      const b = this.pBullets.create(x, y, id+'_b');
+      const bx = x + Math.cos(ang) * 30;
+      const by = y + Math.sin(ang) * 30;
+      if (this.pointInWall(bx, by)) return;
+      const b = this.pBullets.create(bx, by, id+'_b');
       b.setDepth(8).setScale(atk.scale);
       b.setVelocity(Math.cos(ang)*spd, Math.sin(ang)*spd);
       b.damage = dmg;
@@ -670,7 +680,10 @@ class GameScene extends Phaser.Scene {
 
     atk.angles.forEach(offset => {
       const ang = baseAng + offset;
-      const b = this.eBullets.create(x, y, id+'_b');
+      const bx = x + Math.cos(ang) * 30;
+      const by = y + Math.sin(ang) * 30;
+      if (this.pointInWall(bx, by)) return;
+      const b = this.eBullets.create(bx, by, id+'_b');
       b.setDepth(8).setScale(atk.scale);
       b.setVelocity(Math.cos(ang)*spd, Math.sin(ang)*spd);
       b.damage   = dmg;
