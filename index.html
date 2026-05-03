@@ -7,9 +7,16 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #000; overflow: hidden; touch-action: none; }
+    #rot { display:none; position:fixed; inset:0; background:#000; z-index:9999; flex-direction:column; align-items:center; justify-content:center; color:#fff; font-family:sans-serif; text-align:center; }
+    @media (orientation:portrait) { #rot { display:flex; } }
   </style>
 </head>
 <body>
+<div id="rot">
+  <div style="font-size:60px">&#8635;</div>
+  <div style="font-size:22px;font-weight:bold;margin-top:8px">Rotate Your Device</div>
+  <div style="font-size:14px;color:#888;margin-top:6px">LCS plays in landscape mode</div>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
 <script>
 const W = window.innerWidth;
@@ -544,6 +551,8 @@ class GameScene extends Phaser.Scene {
       up:'W',down:'S',left:'A',right:'D',
       aUp:'UP',aDown:'DOWN',aLeft:'LEFT',aRight:'RIGHT',fire:'SPACE'
     });
+    this.lJoyBase = { x: 90, y: H - 85 };
+    this.rJoyBase = { x: W - 90, y: H - 85 };
     this.lJoy={on:false,id:null,bx:0,by:0,dx:0,dy:0};
     this.rJoy={on:false,id:null,bx:0,by:0,dx:0,dy:0};
     this.input.on('pointerdown',this.touchDown,this);
@@ -750,21 +759,37 @@ class GameScene extends Phaser.Scene {
     this.hpBg  = this.add.graphics().setScrollFactor(0).setDepth(100);
     this.hpFg  = this.add.graphics().setScrollFactor(0).setDepth(101);
     this.joyFx = this.add.graphics().setScrollFactor(0).setDepth(99);
-    this.add.text(22,H-55,'HP',{fontSize:'13px',color:'#ff8888',stroke:'#000',strokeThickness:2}).setScrollFactor(0).setDepth(102);
-    this.cntLabel = this.add.text(W/2,16,'Enemies: 6',{
-      fontSize:'20px',color:'#fff',stroke:'#000',strokeThickness:4
-    }).setOrigin(0.5,0).setScrollFactor(0).setDepth(100);
-    const hint = this.add.text(W/2,H-26,'Left: move   Right: aim & shoot',{
-      fontSize:'13px',color:'#cccccc',stroke:'#000',strokeThickness:2
-    }).setOrigin(0.5,1).setScrollFactor(0).setDepth(100);
-    this.time.delayedCall(3200,()=>this.tweens.add({targets:hint,alpha:0,duration:800}));
+
+    // Fixed joystick base rings (always visible)
+    const joyBases = this.add.graphics().setScrollFactor(0).setDepth(98);
+    joyBases.fillStyle(0xffffff, 0.07); joyBases.fillCircle(this.lJoyBase.x, this.lJoyBase.y, 60);
+    joyBases.lineStyle(2, 0xffffff, 0.25); joyBases.strokeCircle(this.lJoyBase.x, this.lJoyBase.y, 60);
+    joyBases.fillStyle(0xffffff, 0.07); joyBases.fillCircle(this.rJoyBase.x, this.rJoyBase.y, 60);
+    joyBases.lineStyle(2, 0xffffff, 0.25); joyBases.strokeCircle(this.rJoyBase.x, this.rJoyBase.y, 60);
+    this.add.text(this.lJoyBase.x, this.lJoyBase.y + 68, 'MOVE', {
+      fontSize:'11px', color:'#ffffff66', stroke:'#000', strokeThickness:1
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(98);
+    this.add.text(this.rJoyBase.x, this.rJoyBase.y + 68, 'SHOOT', {
+      fontSize:'11px', color:'#ffffff66', stroke:'#000', strokeThickness:1
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(98);
+
+    // HP (top-left)
+    this.add.text(16, 4, 'HP', {fontSize:'11px',color:'#ff8888',stroke:'#000',strokeThickness:2}).setScrollFactor(0).setDepth(102);
+    this.cntLabel = this.add.text(W/2, 8, 'Enemies: 6', {
+      fontSize:'18px', color:'#fff', stroke:'#000', strokeThickness:4
+    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(100);
   }
 
   // ─── TOUCH ───────────────────────────────────────────
 
   touchDown(p) {
-    const j=p.x<W/2?this.lJoy:this.rJoy;
-    if(!j.on) Object.assign(j,{on:true,id:p.id,bx:p.x,by:p.y,dx:0,dy:0});
+    const dL = Phaser.Math.Distance.Between(p.x, p.y, this.lJoyBase.x, this.lJoyBase.y);
+    const dR = Phaser.Math.Distance.Between(p.x, p.y, this.rJoyBase.x, this.rJoyBase.y);
+    if (!this.lJoy.on && dL <= 100) {
+      Object.assign(this.lJoy, { on:true, id:p.id, bx:this.lJoyBase.x, by:this.lJoyBase.y, dx:0, dy:0 });
+    } else if (!this.rJoy.on && dR <= 100) {
+      Object.assign(this.rJoy, { on:true, id:p.id, bx:this.rJoyBase.x, by:this.rJoyBase.y, dx:0, dy:0 });
+    }
   }
   touchMove(p) {
     [this.lJoy,this.rJoy].forEach(j=>{
@@ -784,21 +809,24 @@ class GameScene extends Phaser.Scene {
 
   drawHP() {
     this.hpBg.clear(); this.hpFg.clear();
-    const x=22,y=H-38,bw=200,bh=16;
-    this.hpBg.fillStyle(0x000000,0.65); this.hpBg.fillRoundedRect(x,y,bw,bh,8);
+    const x=16, y=18, bw=150, bh=12;
+    this.hpBg.fillStyle(0x000000,0.65); this.hpBg.fillRoundedRect(x,y,bw,bh,6);
     const pct=this.player.health/this.player.maxHealth;
     const col=pct>0.5?0x33ee55:pct>0.25?0xffaa00:0xff3300;
     this.hpFg.fillStyle(col,1);
-    this.hpFg.fillRoundedRect(x+2,y+2,Math.max(0,(bw-4)*pct),bh-4,6);
+    this.hpFg.fillRoundedRect(x+2,y+2,Math.max(0,(bw-4)*pct),bh-4,4);
   }
 
   drawJoysticks() {
     this.joyFx.clear();
-    [this.lJoy,this.rJoy].forEach(j=>{
-      if(!j.on) return;
-      this.joyFx.fillStyle(0xffffff,0.1);   this.joyFx.fillCircle(j.bx,j.by,55);
-      this.joyFx.lineStyle(2,0xffffff,0.3); this.joyFx.strokeCircle(j.bx,j.by,55);
-      this.joyFx.fillStyle(0xffffff,0.35);  this.joyFx.fillCircle(j.bx+j.dx,j.by+j.dy,27);
+    [
+      { joy:this.lJoy, base:this.lJoyBase },
+      { joy:this.rJoy, base:this.rJoyBase }
+    ].forEach(({ joy, base }) => {
+      const sx = base.x + (joy.on ? joy.dx : 0);
+      const sy = base.y + (joy.on ? joy.dy : 0);
+      this.joyFx.fillStyle(0xffffff, joy.on ? 0.45 : 0.18);
+      this.joyFx.fillCircle(sx, sy, 26);
     });
   }
 
@@ -866,6 +894,8 @@ class GameScene extends Phaser.Scene {
 // ─────────────────────────────────────────────────────────
 //  LAUNCH
 // ─────────────────────────────────────────────────────────
+if (screen.orientation?.lock) screen.orientation.lock('landscape').catch(()=>{});
+
 new Phaser.Game({
   type: Phaser.AUTO,
   width: W, height: H,
