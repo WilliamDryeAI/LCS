@@ -896,6 +896,11 @@ class GameScene extends Phaser.Scene {
 // ─────────────────────────────────────────────────────────
 if (screen.orientation?.lock) screen.orientation.lock('landscape').catch(()=>{});
 
+// W and H are fixed at load time — reload when rotating to landscape so they recalculate
+window.addEventListener('orientationchange', function() {
+  setTimeout(function() { location.reload(); }, 350);
+});
+
 new Phaser.Game({
   type: Phaser.AUTO,
   width: W, height: H,
