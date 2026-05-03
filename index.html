@@ -757,7 +757,8 @@ class GameScene extends Phaser.Scene {
       b.setDepth(8).setScale(atk.scale);
       b.setVelocity(Math.cos(ang)*spd, Math.sin(ang)*spd);
       b.damage = dmg;
-      if (atk.rangeScale) { b.birthTime = this.time.now; b.maxLife = atk.life; }
+      b.birthTime = this.time.now; b.maxLife = atk.life;
+      if (atk.rangeScale) b.rangeScale = true;
       this.time.delayedCall(atk.life, ()=>{ if(b?.active) b.destroy(); });
     });
   }
@@ -777,7 +778,8 @@ class GameScene extends Phaser.Scene {
       b.setVelocity(Math.cos(ang)*spd, Math.sin(ang)*spd);
       b.damage = dmg;
       b.ownerBotId = owner?.botId ?? -1;
-      if (atk.rangeScale) { b.birthTime = this.time.now; b.maxLife = atk.life; }
+      b.birthTime = this.time.now; b.maxLife = atk.life;
+      if (atk.rangeScale) b.rangeScale = true;
       this.time.delayedCall(atk.life, ()=>{ if(b?.active) b.destroy(); });
     });
   }
@@ -785,7 +787,7 @@ class GameScene extends Phaser.Scene {
   // ─── HIT HANDLERS ────────────────────────────────────
 
   rangedDmg(bullet) {
-    if (bullet.birthTime === undefined) return bullet.damage;
+    if (!bullet.rangeScale) return bullet.damage;
     const t = Math.min(1, (this.time.now - bullet.birthTime) / bullet.maxLife);
     return Math.round(bullet.damage * (0.4 + 1.4 * t));
   }
@@ -873,6 +875,7 @@ class GameScene extends Phaser.Scene {
     this.hpFg     = this.add.graphics().setScrollFactor(0).setDepth(101);
     this.joyFx    = this.add.graphics().setScrollFactor(0).setDepth(99);
     this.worldHpGfx = this.add.graphics().setDepth(15);
+    this.aimGfx   = this.add.graphics().setDepth(7);
 
     // Fixed joystick base rings (always visible)
     const joyBases = this.add.graphics().setScrollFactor(0).setDepth(98);
@@ -928,6 +931,30 @@ class GameScene extends Phaser.Scene {
     const col=pct>0.5?0x33ee55:pct>0.25?0xffaa00:0xff3300;
     this.hpFg.fillStyle(col,1);
     this.hpFg.fillRoundedRect(x+2,y+2,Math.max(0,(bw-4)*pct),bh-4,4);
+  }
+
+  drawAimIndicator() {
+    this.aimGfx.clear();
+    const isAiming = this.fireBtn.on || this.keys.fire.isDown;
+    if (!isAiming || !this.player?.active) return;
+    const { atk, bulletColor } = this.ch;
+    const range = 640 * atk.speedMult * atk.life / 1000;
+    const baseAng = Math.atan2(this.lastFacing.y, this.lastFacing.x);
+    const dash = 12, seg = 21;
+    atk.angles.forEach(offset => {
+      const ang = baseAng + offset;
+      let d = 30;
+      while (d < range) {
+        const dEnd = Math.min(d + dash, range);
+        const alpha = 0.65 * (1 - (d / range) * 0.65);
+        this.aimGfx.lineStyle(2, bulletColor, alpha);
+        this.aimGfx.beginPath();
+        this.aimGfx.moveTo(this.player.x + Math.cos(ang)*d, this.player.y + Math.sin(ang)*d);
+        this.aimGfx.lineTo(this.player.x + Math.cos(ang)*dEnd, this.player.y + Math.sin(ang)*dEnd);
+        this.aimGfx.strokePath();
+        d += seg;
+      }
+    });
   }
 
   drawWorldHP() {
@@ -1004,6 +1031,14 @@ class GameScene extends Phaser.Scene {
       this.lastShot = time;
     }
 
+    // Fade bullets near the end of their range
+    const fadeWin = 350;
+    [...this.pBullets.getChildren(), ...this.eBullets.getChildren()].forEach(b => {
+      if (!b.active || b.maxLife === undefined) return;
+      const remaining = b.maxLife - (time - b.birthTime);
+      b.setAlpha(remaining < fadeWin ? Math.max(0.05, remaining / fadeWin) : 1);
+    });
+
     // Enemy AI
     this.enemies.getChildren().forEach(e => {
       // Find nearest target
@@ -1066,6 +1101,7 @@ class GameScene extends Phaser.Scene {
     this.nameTag.setPosition(this.player.x, this.player.y-50);
     this.drawHP();
     this.drawWorldHP();
+    this.drawAimIndicator();
     this.drawControls();
   }
 }
