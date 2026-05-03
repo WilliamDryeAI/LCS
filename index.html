@@ -52,7 +52,7 @@ const CHARS = [
     rank:'Advanced', rankStars:2, rankColor:0x4499ff,
     brawlerClass:'Sniper', classColor:0x2266bb,
     hp:3800, spd:195, dmg:770, cost:150,
-    atk:{ angles:[0], cooldown:700, scale:0.7, speedMult:1.9, life:3500 }
+    atk:{ angles:[0], cooldown:700, scale:0.7, speedMult:1.9, life:3500, rangeScale:true }
   },
   {
     id:'titan', name:'Titan', tag:'T-Shape Area Controller',
@@ -69,8 +69,8 @@ const CHARS = [
     color:0x33bb33, accent:0xaaffaa, eye:0xff4400, bulletColor:0x88ff44,
     rank:'Advanced', rankStars:2, rankColor:0x4499ff,
     brawlerClass:'Sprayer', classColor:0x228833,
-    hp:4500, spd:205, dmg:195, cost:250,
-    atk:{ angles:[-0.44,-0.22,0,0.22,0.44], cooldown:1100, scale:0.85, speedMult:0.85, life:1300 }
+    hp:4500, spd:205, dmg:260, cost:250,
+    atk:{ angles:[-0.44,-0.22,0,0.22,0.44], cooldown:950, scale:0.85, speedMult:0.85, life:1300 }
   },
   {
     id:'nova', name:'Nova', tag:'Wide Burst Specialist',
@@ -87,8 +87,8 @@ const CHARS = [
     color:0xddcc00, accent:0xffffaa, eye:0x0033ff, bulletColor:0xffff44,
     rank:'Elite', rankStars:3, rankColor:0xcc66ff,
     brawlerClass:'Fighter', classColor:0xaa8800,
-    hp:3200, spd:240, dmg:490, cost:450,
-    atk:{ angles:[-0.1,0.1], cooldown:520, scale:1.0, speedMult:1.3, life:2000 }
+    hp:3200, spd:240, dmg:620, cost:450,
+    atk:{ angles:[-0.1,0.1], cooldown:450, scale:1.0, speedMult:1.3, life:2000 }
   },
   {
     id:'pulse', name:'Pulse', tag:'Rapid-Fire Machine Gun',
@@ -705,6 +705,7 @@ class GameScene extends Phaser.Scene {
       b.setDepth(8).setScale(atk.scale);
       b.setVelocity(Math.cos(ang)*spd, Math.sin(ang)*spd);
       b.damage = dmg;
+      if (atk.rangeScale) { b.birthTime = this.time.now; b.maxLife = atk.life; }
       this.time.delayedCall(atk.life, ()=>{ if(b?.active) b.destroy(); });
     });
   }
@@ -722,17 +723,25 @@ class GameScene extends Phaser.Scene {
       const b = this.eBullets.create(bx, by, id+'_b');
       b.setDepth(8).setScale(atk.scale);
       b.setVelocity(Math.cos(ang)*spd, Math.sin(ang)*spd);
-      b.damage   = dmg;
+      b.damage = dmg;
       b.ownerBotId = owner?.botId ?? -1;
+      if (atk.rangeScale) { b.birthTime = this.time.now; b.maxLife = atk.life; }
       this.time.delayedCall(atk.life, ()=>{ if(b?.active) b.destroy(); });
     });
   }
 
   // ─── HIT HANDLERS ────────────────────────────────────
 
+  rangedDmg(bullet) {
+    if (bullet.birthTime === undefined) return bullet.damage;
+    const t = Math.min(1, (this.time.now - bullet.birthTime) / bullet.maxLife);
+    return Math.round(bullet.damage * (0.4 + 1.4 * t));
+  }
+
   hitEnemy(bullet, enemy) {
+    const dmg = this.rangedDmg(bullet);
     bullet.destroy();
-    enemy.health -= bullet.damage;
+    enemy.health -= dmg;
     this.tweens.add({targets:enemy,alpha:0.1,duration:60,yoyo:true});
     if (enemy.health <= 0) {
       if (enemy.label) enemy.label.destroy();
@@ -746,16 +755,18 @@ class GameScene extends Phaser.Scene {
 
   hitPlayer(player, bullet) {
     if (this.gameOver) return;
+    const dmg = this.rangedDmg(bullet);
     bullet.destroy();
-    this.player.health = Math.max(0, this.player.health - bullet.damage);
+    this.player.health = Math.max(0, this.player.health - dmg);
     this.tweens.add({targets:this.player,alpha:0.1,duration:80,yoyo:true});
     if (this.player.health === 0) this.endGame(false);
   }
 
   hitBotByBot(bullet, enemy) {
     if (bullet.ownerBotId === enemy.botId) return;
+    const dmg = this.rangedDmg(bullet);
     bullet.destroy();
-    enemy.health -= bullet.damage;
+    enemy.health -= dmg;
     this.tweens.add({targets:enemy,alpha:0.1,duration:60,yoyo:true});
     if (enemy.health <= 0) {
       if (enemy.label) enemy.label.destroy();
