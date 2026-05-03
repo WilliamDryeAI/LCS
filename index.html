@@ -28,58 +28,94 @@ const H = window.innerHeight;
 // ─────────────────────────────────────────────────────────
 const CHARS = [
   {
-    id:'blaze', name:'Blaze', tag:'Fast Fire Shooter',
-    desc:'Shoots 3 fire pellets in a wide spread. Excels at close range by overwhelming enemies with volume.',
+    id:'blaze', name:'Blaze', tag:'Triple-Shot Blaster',
+    desc:'Fires 3 pellets in a wide spread. Strong up close but loses accuracy at range.',
     color:0xff6600, accent:0xffcc00, eye:0xffffff, bulletColor:0xff8800,
-    rank:'Basic',    rankStars:1, rankColor:0xaaaaaa,
+    rank:'Basic', rankStars:1, rankColor:0xaaaaaa,
     brawlerClass:'Blaster', classColor:0xff6600,
-    hp:5000, spd:230, dmg:500, cost:0,
-    atk:{ angles:[-0.28,0,0.28], cooldown:750, scale:1.0, speedMult:1.0, life:1800 }
+    hp:2000, spd:220, dmg:180, cost:0,
+    atk:{ angles:[-0.28,0,0.28], cooldown:900, scale:1.0, speedMult:1.0, life:1800 }
   },
   {
-    id:'boulder', name:'Boulder', tag:'Iron Rock Tank',
-    desc:'Hurls one massive boulder per shot dealing devastating damage. Nearly impossible to stop at full health.',
+    id:'boulder', name:'Boulder', tag:'Slow Heavy Tank',
+    desc:'Lobs one massive boulder per shot. Slow reload and movement but hits like a truck.',
     color:0x999999, accent:0xcccccc, eye:0xffffff, bulletColor:0xbbbbbb,
-    rank:'Basic',    rankStars:1, rankColor:0xaaaaaa,
+    rank:'Basic', rankStars:1, rankColor:0xaaaaaa,
     brawlerClass:'Tank', classColor:0x887755,
-    hp:8000, spd:150, dmg:1500, cost:0,
-    atk:{ angles:[0], cooldown:1500, scale:2.8, speedMult:0.5, life:3000 }
+    hp:3500, spd:140, dmg:580, cost:0,
+    atk:{ angles:[0], cooldown:1800, scale:2.8, speedMult:0.5, life:3000 }
   },
   {
-    id:'frost', name:'Frost', tag:'Icy Long-Range Sniper',
-    desc:'Fires a single lightning-fast ice bolt with extreme range. Punishes enemies from distances others cannot reach.',
+    id:'frost', name:'Frost', tag:'Long-Range Sniper',
+    desc:'Single fast ice bolt with extreme reach. Punishes anyone caught in the open.',
     color:0x44aaff, accent:0xaaddff, eye:0xffffff, bulletColor:0x88eeff,
     rank:'Advanced', rankStars:2, rankColor:0x4499ff,
     brawlerClass:'Sniper', classColor:0x2266bb,
-    hp:3800, spd:200, dmg:1100, cost:150,
-    atk:{ angles:[0], cooldown:600, scale:0.7, speedMult:1.9, life:3500 }
+    hp:1500, spd:195, dmg:400, cost:150,
+    atk:{ angles:[0], cooldown:700, scale:0.7, speedMult:1.9, life:3500 }
   },
   {
-    id:'venom', name:'Venom', tag:'Toxic Spray Attacker',
-    desc:'Unleashes 5 toxic pellets in a wide cone. Devastating at close range but struggles against distant targets.',
+    id:'titan', name:'Titan', tag:'T-Shape Area Controller',
+    desc:'Fires forward plus hard left and right simultaneously. Controls corridors and forces enemies to move diagonally.',
+    color:0x4a7c2a, accent:0x90c850, eye:0xffffff, bulletColor:0xaadd44,
+    rank:'Advanced', rankStars:2, rankColor:0x4499ff,
+    brawlerClass:'Controller', classColor:0x3a6a1a,
+    hp:3000, spd:155, dmg:340, cost:200,
+    atk:{ angles:[-1.57,0,1.57], cooldown:1300, scale:1.1, speedMult:0.75, life:2000 }
+  },
+  {
+    id:'venom', name:'Venom', tag:'Close-Range Sprayer',
+    desc:'5-pellet wide cone that devastates at close range. Drops off sharply at distance.',
     color:0x33bb33, accent:0xaaffaa, eye:0xff4400, bulletColor:0x88ff44,
     rank:'Advanced', rankStars:2, rankColor:0x4499ff,
     brawlerClass:'Sprayer', classColor:0x228833,
-    hp:4500, spd:210, dmg:280, cost:250,
-    atk:{ angles:[-0.44,-0.22,0,0.22,0.44], cooldown:900, scale:0.85, speedMult:0.85, life:1500 }
+    hp:2000, spd:205, dmg:90, cost:250,
+    atk:{ angles:[-0.44,-0.22,0,0.22,0.44], cooldown:1100, scale:0.85, speedMult:0.85, life:1300 }
   },
   {
-    id:'storm', name:'Storm', tag:'Electric Striker',
-    desc:'Launches twin electric bolts in rapid succession. Consistent high damage output makes it lethal in every situation.',
+    id:'nova', name:'Nova', tag:'Wide Burst Specialist',
+    desc:'Unleashes 6 bullets in a massive fan covering the entire front arc. Deadly up close, nearly useless at range.',
+    color:0xdd9900, accent:0xffdd44, eye:0xffffff, bulletColor:0xffcc00,
+    rank:'Advanced', rankStars:2, rankColor:0x4499ff,
+    brawlerClass:'Blaster', classColor:0xbb7700,
+    hp:2600, spd:210, dmg:210, cost:350,
+    atk:{ angles:[-1.2,-0.72,-0.24,0.24,0.72,1.2], cooldown:1200, scale:0.9, speedMult:0.88, life:1100 }
+  },
+  {
+    id:'storm', name:'Storm', tag:'Twin-Bolt Fighter',
+    desc:'Two electric bolts per shot with a tight spread. Reliable damage at most ranges.',
     color:0xddcc00, accent:0xffffaa, eye:0x0033ff, bulletColor:0xffff44,
-    rank:'Elite',    rankStars:3, rankColor:0xcc66ff,
+    rank:'Elite', rankStars:3, rankColor:0xcc66ff,
     brawlerClass:'Fighter', classColor:0xaa8800,
-    hp:3200, spd:250, dmg:700, cost:450,
-    atk:{ angles:[-0.1,0.1], cooldown:420, scale:1.0, speedMult:1.3, life:2000 }
+    hp:1300, spd:240, dmg:250, cost:450,
+    atk:{ angles:[-0.1,0.1], cooldown:520, scale:1.0, speedMult:1.3, life:2000 }
   },
   {
-    id:'shadow', name:'Shadow', tag:'Stealth Assassin',
-    desc:'Throws rapid shadow daggers with terrifying speed. A true glass cannon — delete enemies before they react.',
+    id:'pulse', name:'Pulse', tag:'Rapid-Fire Machine Gun',
+    desc:'Fires a stream of single shots at blistering speed. Requires sustained aim to maximise damage.',
+    color:0x00cccc, accent:0x88ffff, eye:0x000000, bulletColor:0x44ffff,
+    rank:'Elite', rankStars:3, rankColor:0xcc66ff,
+    brawlerClass:'Gunner', classColor:0x009999,
+    hp:2100, spd:230, dmg:260, cost:500,
+    atk:{ angles:[0], cooldown:220, scale:0.6, speedMult:1.5, life:1700 }
+  },
+  {
+    id:'phantom', name:'Phantom', tag:'Double-Tap Marksman',
+    desc:'Fires two parallel high-damage shots at once with a long reload. High risk, huge reward.',
+    color:0x220066, accent:0x8844cc, eye:0xff2200, bulletColor:0xaa44ff,
+    rank:'Elite', rankStars:3, rankColor:0xcc66ff,
+    brawlerClass:'Marksman', classColor:0x440099,
+    hp:1700, spd:215, dmg:850, cost:650,
+    atk:{ angles:[-0.06,0.06], cooldown:1600, scale:0.9, speedMult:1.7, life:2800 }
+  },
+  {
+    id:'shadow', name:'Shadow', tag:'Glass Cannon Assassin',
+    desc:'Rapid single daggers with extreme speed. Shreds targets in seconds but dies in two hits.',
     color:0x8833cc, accent:0xddaaff, eye:0xff0000, bulletColor:0xdd44ff,
     rank:'Ultimate', rankStars:4, rankColor:0xffdd00,
     brawlerClass:'Assassin', classColor:0x661199,
-    hp:2800, spd:270, dmg:1600, cost:700,
-    atk:{ angles:[0], cooldown:250, scale:0.6, speedMult:1.7, life:1500 }
+    hp:1100, spd:265, dmg:280, cost:700,
+    atk:{ angles:[0], cooldown:300, scale:0.6, speedMult:1.7, life:1500 }
   },
 ];
 
@@ -310,9 +346,10 @@ class CharSelectScene extends Phaser.Scene {
   }
 
   buildGrid() {
-    const cols=3, rows=2;
-    const cw = Math.min(178,(W-60)/cols);
-    const ch = Math.min(148,(H-130)/rows);
+    const cols = CHARS.length <= 6 ? 3 : 5;
+    const rows = Math.ceil(CHARS.length / cols);
+    const cw = Math.min(160,(W-60)/cols);
+    const ch = Math.min(140,(H-130)/rows);
     const gx=12, gy=10;
     const totalW = cols*cw+(cols-1)*gx;
     const totalH = rows*ch+(rows-1)*gy;
@@ -908,7 +945,10 @@ class GameScene extends Phaser.Scene {
 
       const eCd=e.eChar.atk.cooldown;
       if(nearestDist<600 && time-e.lastShot>eCd){
-        this.shootEnemy(e.x,e.y,dx,dy,e.eChar,e);
+        // Inaccuracy: small at close range, large at distance
+        const spread = Math.min(0.6, 0.1 + nearestDist / 1000);
+        const aimAng = Math.atan2(dy,dx) + (Math.random()-0.5)*2*spread;
+        this.shootEnemy(e.x,e.y,Math.cos(aimAng),Math.sin(aimAng),e.eChar,e);
         e.lastShot=time;
       }
       if(e.label) e.label.setPosition(e.x,e.y-34);
