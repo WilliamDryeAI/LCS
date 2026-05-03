@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Last Circle Standing</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; overflow: hidden; touch-action: none; }
+  </style>
+</head>
+<body>
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+<script>
+const W = window.innerWidth;
+const H = window.innerHeight;
+
+// ─────────────────────────────────────────────────────────
+//  CHARACTER DATA
+//  atk: angles=spread offsets(rad), cooldown=ms, scale=bullet size,
+//       speedMult=bullet speed multiplier, life=bullet lifetime ms
+// ─────────────────────────────────────────────────────────
+const CHARS = [
+  {
+    id:'blaze', name:'Blaze', tag:'Fast Fire Shooter',
+    desc:'Shoots 3 fire pellets in a wide spread. Excels at close range by overwhelming enemies with volume.',
+    color:0xff6600, accent:0xffcc00, eye:0xffffff, bulletColor:0xff8800,
+    rank:'Basic',    rankStars:1, rankColor:0xaaaaaa,
+    brawlerClass:'Blaster', classColor:0xff6600,
+    hp:5000, spd:230, dmg:500, cost:0,
+    atk:{ angles:[-0.28,0,0.28], cooldown:750, scale:1.0, speedMult:1.0, life:1800 }
+  },
+  {
+    id:'boulder', name:'Boulder', tag:'Iron Rock Tank',
+    desc:'Hurls one massive boulder per shot dealing devastating damage. Nearly impossible to stop at full health.',
+    color:0x999999, accent:0xcccccc, eye:0xffffff, bulletColor:0xbbbbbb,
+    rank:'Basic',    rankStars:1, rankColor:0xaaaaaa,
+    brawlerClass:'Tank', classColor:0x887755,
+    hp:8000, spd:150, dmg:1500, cost:0,
+    atk:{ angles:[0], cooldown:1500, scale:2.8, speedMult:0.5, life:3000 }
+  },
+  {
+    id:'frost', name:'Frost', tag:'Icy Long-Range Sniper',
+    desc:'Fires a single lightning-fast ice bolt with extreme range. Punishes enemies from distances others cannot reach.',
+    color:0x44aaff, accent:0xaaddff, eye:0xffffff, bulletColor:0x88eeff,
+    rank:'Advanced', rankStars:2, rankColor:0x4499ff,
+    brawlerClass:'Sniper', classColor:0x2266bb,
+    hp:3800, spd:200, dmg:1100, cost:150,
+    atk:{ angles:[0], cooldown:600, scale:0.7, speedMult:1.9, life:3500 }
+  },
+  {
+    id:'venom', name:'Venom', tag:'Toxic Spray Attacker',
+    desc:'Unleashes 5 toxic pellets in a wide cone. Devastating at close range but struggles against distant targets.',
+    color:0x33bb33, accent:0xaaffaa, eye:0xff4400, bulletColor:0x88ff44,
+    rank:'Advanced', rankStars:2, rankColor:0x4499ff,
+    brawlerClass:'Sprayer', classColor:0x228833,
+    hp:4500, spd:210, dmg:280, cost:250,
+    atk:{ angles:[-0.44,-0.22,0,0.22,0.44], cooldown:900, scale:0.85, speedMult:0.85, life:1500 }
+  },
+  {
+    id:'storm', name:'Storm', tag:'Electric Striker',
+    desc:'Launches twin electric bolts in rapid succession. Consistent high damage output makes it lethal in every situation.',
+    color:0xddcc00, accent:0xffffaa, eye:0x0033ff, bulletColor:0xffff44,
+    rank:'Elite',    rankStars:3, rankColor:0xcc66ff,
+    brawlerClass:'Fighter', classColor:0xaa8800,
+    hp:3200, spd:250, dmg:700, cost:450,
+    atk:{ angles:[-0.1,0.1], cooldown:420, scale:1.0, speedMult:1.3, life:2000 }
+  },
+  {
+    id:'shadow', name:'Shadow', tag:'Stealth Assassin',
+    desc:'Throws rapid shadow daggers with terrifying speed. A true glass cannon — delete enemies before they react.',
+    color:0x8833cc, accent:0xddaaff, eye:0xff0000, bulletColor:0xdd44ff,
+    rank:'Ultimate', rankStars:4, rankColor:0xffdd00,
+    brawlerClass:'Assassin', classColor:0x661199,
+    hp:2800, spd:270, dmg:1600, cost:700,
+    atk:{ angles:[0], cooldown:250, scale:0.6, speedMult:1.7, life:1500 }
+  },
+];
+
+// ─────────────────────────────────────────────────────────
+//  SAVE / LOAD
+// ─────────────────────────────────────────────────────────
+function loadData() {
+  const defUnlocked = CHARS.filter(c => c.cost === 0).map(c => c.id);
+  return {
+    coins:    parseInt(localStorage.getItem('br_coins') || '0'),
+    unlocked: JSON.parse(localStorage.getItem('br_unlocked') || JSON.stringify(defUnlocked))
+  };
+}
+function saveData(d) {
+  localStorage.setItem('br_coins',    String(d.coins));
+  localStorage.setItem('br_unlocked', JSON.stringify(d.unlocked));
+}
+
+// ─────────────────────────────────────────────────────────
+//  SHARED UTILITIES
+// ─────────────────────────────────────────────────────────
+function buildTextures(scene) {
+  const t = (key, w, h, fn) => {
+    if (scene.textures.exists(key)) return;
+    const g = scene.make.graphics({ x:0, y:0, add:false });
+    fn(g); g.generateTexture(key, w, h); g.destroy();
+  };
+
+  CHARS.forEach(c => {
+    // small sprite 48x48
+    t(c.id+'_sm', 48, 48, g => {
+      g.fillStyle(c.color);  g.fillCircle(24,24,24);
+      g.fillStyle(c.accent); g.fillCircle(24,24,14);
+      g.fillStyle(c.color);  g.fillCircle(24,24,7);
+      g.fillStyle(c.eye);    g.fillCircle(19,18,5);
+      g.fillStyle(0x000000); g.fillCircle(20,19,2);
+    });
+    // card sprite 64x64
+    t(c.id+'_md', 64, 64, g => {
+      g.fillStyle(c.color);  g.fillCircle(32,32,32);
+      g.fillStyle(c.accent); g.fillCircle(32,32,19);
+      g.fillStyle(c.color);  g.fillCircle(32,32,9);
+      g.fillStyle(c.eye);    g.fillCircle(25,23,7);
+      g.fillStyle(0x000000); g.fillCircle(26,24,3);
+    });
+    // character-specific bullet 14x14
+    t(c.id+'_b', 14, 14, g => {
+      g.fillStyle(c.bulletColor); g.fillCircle(7,7,7);
+      g.fillStyle(0xffffff,0.35); g.fillCircle(5,5,3);
+    });
+  });
+
+  t('ebullet',12,12, g => {
+    g.fillStyle(0xff44aa); g.fillCircle(6,6,6);
+    g.fillStyle(0xffaadd); g.fillCircle(6,6,3);
+  });
+  t('enemy',44,44, g => {
+    g.fillStyle(0x6622aa); g.fillCircle(22,22,22);
+    g.fillStyle(0x9944cc); g.fillCircle(22,22,13);
+    g.fillStyle(0xcc88ff); g.fillCircle(22,22,6);
+    g.fillStyle(0xffffff); g.fillCircle(17,16,4);
+    g.fillStyle(0x000000); g.fillCircle(18,17,2);
+  });
+  t('wall',64,64, g => {
+    g.fillStyle(0x665544); g.fillRect(0,0,64,64);
+    g.fillStyle(0x887766); g.fillRect(3,3,58,58);
+    g.fillStyle(0x554433); g.fillRect(6,6,52,52);
+    g.fillStyle(0x776655); g.fillRect(9,9,46,46);
+  });
+  t('coin',20,20, g => {
+    g.fillStyle(0xffdd00); g.fillCircle(10,10,10);
+    g.fillStyle(0xffaa00); g.fillCircle(10,10,7);
+    g.fillStyle(0xffee88); g.fillCircle(8,8,3);
+  });
+}
+
+function drawBG(scene) {
+  const g = scene.add.graphics();
+  g.fillStyle(0x080818); g.fillRect(0,0,W,H);
+  g.fillStyle(0xffffff,0.6);
+  for (let i=0;i<90;i++) {
+    g.fillCircle(
+      Phaser.Math.Between(0,W), Phaser.Math.Between(0,H),
+      Phaser.Math.FloatBetween(0.5,2)
+    );
+  }
+  g.fillStyle(0x1a0033,0.4); g.fillCircle(W*0.15,H*0.25,110);
+  g.fillStyle(0x001a33,0.4); g.fillCircle(W*0.85,H*0.75,95);
+  g.fillStyle(0x1a1a00,0.3); g.fillCircle(W*0.6, H*0.2, 80);
+}
+
+function makeBtn(scene, x, y, w, h, label, color=0xee8800) {
+  const c = scene.add.container(x,y);
+  const sh = scene.add.graphics();
+  sh.fillStyle(0x000000,0.35);
+  sh.fillRoundedRect(-w/2+3,-h/2+3,w,h,h/2);
+  const bg = scene.add.graphics();
+  bg.fillStyle(color,1);
+  bg.fillRoundedRect(-w/2,-h/2,w,h,h/2);
+  bg.fillStyle(0xffffff,0.15);
+  bg.fillRoundedRect(-w/2+3,-h/2+3,w-6,h*0.45,4);
+  const tx = scene.add.text(0,1,label,{
+    fontSize:Math.floor(h*0.4)+'px', color:'#ffffff',
+    stroke:'#00000099', strokeThickness:3, fontStyle:'bold'
+  }).setOrigin(0.5);
+  c.add([sh,bg,tx]);
+  c.setInteractive(new Phaser.Geom.Rectangle(-w/2,-h/2,w,h), Phaser.Geom.Rectangle.Contains);
+  c.on('pointerover',()=>scene.tweens.add({targets:c,scaleX:1.07,scaleY:1.07,duration:80}));
+  c.on('pointerout', ()=>scene.tweens.add({targets:c,scaleX:1,scaleY:1,duration:80}));
+  c.on('pointerdown',()=>scene.tweens.add({targets:c,scaleX:0.94,scaleY:0.94,duration:50}));
+  c.on('pointerup',  ()=>scene.tweens.add({targets:c,scaleX:1.07,scaleY:1.07,duration:50}));
+  return c;
+}
+
+function coinBadge(scene, x, y, coins) {
+  const g = scene.add.graphics();
+  g.fillStyle(0x221100,0.85); g.fillRoundedRect(x-60,y-15,120,30,8);
+  scene.add.text(x, y, `COINS: ${coins}`, {
+    fontSize:'13px', color:'#ffdd00', stroke:'#000', strokeThickness:2, fontStyle:'bold'
+  }).setOrigin(0.5);
+}
+
+function header(scene, title) {
+  scene.add.text(W/2,28,title,{
+    fontSize:'26px', color:'#ffdd00',
+    stroke:'#000000', strokeThickness:5, fontStyle:'bold'
+  }).setOrigin(0.5,0.5);
+  const b = makeBtn(scene,55,28,90,38,'< BACK',0x334466);
+  b.on('pointerup',()=>scene.scene.start('HomeScene'));
+}
+
+// ─────────────────────────────────────────────────────────
+//  HOME SCENE
+// ─────────────────────────────────────────────────────────
+class HomeScene extends Phaser.Scene {
+  constructor() { super('HomeScene'); }
+
+  create() {
+    buildTextures(this);
+
+    // Validate saved character is still unlocked
+    const data = loadData();
+    const saved = this.registry.get('selectedChar');
+    if (!saved || !data.unlocked.includes(saved.id)) {
+      this.registry.set('selectedChar', CHARS.find(c => data.unlocked.includes(c.id)) || CHARS[0]);
+    }
+    const ch = this.registry.get('selectedChar');
+
+    drawBG(this);
+
+    // Coin badge top-right
+    coinBadge(this, W - 75, 26, data.coins);
+
+    // Title
+    const lcsFont    = Math.min(Math.floor(H * 0.14), 58);
+    const subtitleFont = Math.min(Math.floor(H * 0.06), 26);
+    const titleY = H * 0.1;
+    this.add.text(W/2, titleY, 'LCS', {
+      fontSize:lcsFont+'px', color:'#ffdd00',
+      stroke:'#994400', strokeThickness:9, fontStyle:'bold'
+    }).setOrigin(0.5);
+    this.add.text(W/2, titleY + lcsFont, 'LAST CIRCLE STANDING', {
+      fontSize:subtitleFont+'px', color:'#ffffff',
+      stroke:'#222222', strokeThickness:6, fontStyle:'bold'
+    }).setOrigin(0.5);
+
+    // Character preview — centered
+    const charY = H * 0.44;
+    const ring = this.add.graphics();
+    ring.fillStyle(ch.color, 0.2); ring.fillCircle(W/2, charY, 50);
+    ring.lineStyle(3, ch.color, 0.7); ring.strokeCircle(W/2, charY, 50);
+    const spr = this.add.image(W/2, charY, ch.id+'_md').setDepth(1);
+    this.tweens.add({ targets:spr, y:charY-8, duration:950, yoyo:true, repeat:-1, ease:'Sine.easeInOut' });
+    this.add.text(W/2, charY+46, ch.name, {
+      fontSize:'20px', color:'#ffffff', stroke:'#000000', strokeThickness:4, fontStyle:'bold'
+    }).setOrigin(0.5);
+    this.add.text(W/2, charY+66, ch.tag, {
+      fontSize:'12px', color:'#ffdd99', stroke:'#000000', strokeThickness:2
+    }).setOrigin(0.5);
+
+    // PLAY — centered, lower
+    const play = makeBtn(this, W/2, H*0.74, 240, 62, 'PLAY', 0x22cc44);
+    play.on('pointerup', () => this.scene.start('GameScene'));
+
+    // Bottom nav
+    const navY = H*0.91;
+    const gap  = Math.min(148, W*0.17);
+    const chars = makeBtn(this, W/2-gap, navY, 120, 42, 'CHARACTERS', 0x2255cc);
+    chars.on('pointerup', () => this.scene.start('CharSelectScene'));
+    const shop = makeBtn(this, W/2, navY, 100, 42, 'SHOP', 0xcc5500);
+    shop.on('pointerup', () => this.scene.start('ShopScene'));
+    const sett = makeBtn(this, W/2+gap, navY, 110, 42, 'SETTINGS', 0x445566);
+    sett.on('pointerup', () => this.scene.start('SettingsScene'));
+
+    this.add.text(W-8,H-8,'v0.1',{fontSize:'11px',color:'#555577'}).setOrigin(1,1);
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+//  CHARACTER SELECT SCENE
+// ─────────────────────────────────────────────────────────
+class CharSelectScene extends Phaser.Scene {
+  constructor() { super('CharSelectScene'); }
+
+  create() {
+    buildTextures(this);
+    drawBG(this);
+    header(this, 'SELECT FIGHTER');
+
+    this.gd = loadData();
+    coinBadge(this, W-75, 26, this.gd.coins);
+
+    // Default selection — first unlocked char
+    const saved = this.registry.get('selectedChar');
+    this.selIdx = CHARS.findIndex(c => c.id === saved?.id && this.gd.unlocked.includes(c.id));
+    if (this.selIdx < 0) this.selIdx = CHARS.findIndex(c => this.gd.unlocked.includes(c.id));
+
+    this.cards = [];
+    this.buildGrid();
+
+    const playBtn = makeBtn(this, W/2, H-34, 210, 52, 'PLAY', 0x22cc44);
+    playBtn.on('pointerup', () => {
+      this.registry.set('selectedChar', CHARS[this.selIdx]);
+      this.scene.start('GameScene');
+    });
+
+    this.refreshBorders();
+  }
+
+  buildGrid() {
+    const cols=3, rows=2;
+    const cw = Math.min(178,(W-60)/cols);
+    const ch = Math.min(148,(H-130)/rows);
+    const gx=12, gy=10;
+    const totalW = cols*cw+(cols-1)*gx;
+    const totalH = rows*ch+(rows-1)*gy;
+    const sx = (W-totalW)/2;
+    const sy = 58 + (H-58-78-totalH)/2 + 8;
+
+    CHARS.forEach((c,i) => {
+      const col=i%cols, row=Math.floor(i/cols);
+      const cx = sx+col*(cw+gx)+cw/2;
+      const cy = sy+row*(ch+gy)+ch/2;
+      this.makeCard(cx, cy, cw, ch, c, i);
+    });
+  }
+
+  makeCard(cx, cy, cw, ch, char, idx) {
+    const isUnlocked = this.gd.unlocked.includes(char.id);
+    const canAfford  = !isUnlocked && this.gd.coins >= char.cost;
+
+    const con = this.add.container(cx, cy);
+    const bg = this.add.graphics();
+    bg.fillStyle(0x111122, 0.92);
+    bg.fillRoundedRect(-cw/2,-ch/2,cw,ch,12);
+    const border = this.add.graphics();
+    const spr = this.add.image(0,-ch*0.1, char.id+'_md').setDepth(1);
+    const nm = this.add.text(0, ch*0.22, char.name, {
+      fontSize:'15px', color:'#ffffff', stroke:'#000', strokeThickness:3, fontStyle:'bold'
+    }).setOrigin(0.5);
+    const tg = this.add.text(0, ch*0.38, char.tag, {
+      fontSize:'10px', color:'#ffdd99'
+    }).setOrigin(0.5);
+
+    con.add([bg, border, spr, nm, tg]);
+
+    if (isUnlocked) {
+      con.setInteractive(new Phaser.Geom.Rectangle(-cw/2,-ch/2,cw,ch), Phaser.Geom.Rectangle.Contains);
+      con.on('pointerup', () => { this.selIdx=idx; this.refreshBorders(); });
+      con.on('pointerover',()=>this.tweens.add({targets:con,scaleX:1.04,scaleY:1.04,duration:80}));
+      con.on('pointerout', ()=>this.tweens.add({targets:con,scaleX:1,scaleY:1,duration:80}));
+    } else {
+      // Lock overlay
+      const ov = this.add.graphics();
+      ov.fillStyle(0x000000, canAfford ? 0.55 : 0.72);
+      ov.fillRoundedRect(-cw/2,-ch/2,cw,ch,12);
+
+      // Glowing border if affordable
+      if (canAfford) {
+        ov.lineStyle(2, 0xffdd00, 0.7);
+        ov.strokeRoundedRect(-cw/2,-ch/2,cw,ch,12);
+      }
+
+      const costCol = canAfford ? '#ffdd00' : '#888899';
+      const costTxt = this.add.text(0, -ch*0.06, `${char.cost} COINS`, {
+        fontSize:'15px', color:costCol, stroke:'#000', strokeThickness:3, fontStyle:'bold'
+      }).setOrigin(0.5);
+
+      const hintTxt = this.add.text(0, ch*0.18,
+        canAfford ? 'TAP TO UNLOCK' : 'NOT ENOUGH COINS', {
+        fontSize:'10px', color: canAfford ? '#88ff88' : '#886666'
+      }).setOrigin(0.5);
+
+      con.add([ov, costTxt, hintTxt]);
+
+      if (canAfford) {
+        con.setInteractive(new Phaser.Geom.Rectangle(-cw/2,-ch/2,cw,ch), Phaser.Geom.Rectangle.Contains);
+        con.on('pointerup', () => this.showUnlockPopup(char));
+        con.on('pointerover',()=>this.tweens.add({targets:con,scaleX:1.04,scaleY:1.04,duration:80}));
+        con.on('pointerout', ()=>this.tweens.add({targets:con,scaleX:1,scaleY:1,duration:80}));
+      }
+    }
+
+    this.cards.push({ con, border, char, cw, ch });
+  }
+
+  refreshBorders() {
+    this.cards.forEach(({border,char,cw,ch},i) => {
+      border.clear();
+      if (i === this.selIdx) {
+        border.lineStyle(3, char.color, 1);
+        border.strokeRoundedRect(-cw/2,-ch/2,cw,ch,12);
+        border.fillStyle(char.color, 0.13);
+        border.fillRoundedRect(-cw/2,-ch/2,cw,ch,12);
+      }
+    });
+  }
+
+  showUnlockPopup(char) {
+    const pop = [];
+    const close = () => { pop.forEach(el => el.destroy()); };
+
+    // Blocker + dimmer
+    const zone = this.add.zone(W/2,H/2,W,H).setInteractive().setDepth(200);
+    const dim = this.add.graphics().setDepth(200);
+    dim.fillStyle(0x000000, 0.72); dim.fillRect(0,0,W,H);
+    pop.push(zone, dim);
+
+    // Box
+    const bw = Math.min(310, W*0.78), bh = 220;
+    const box = this.add.graphics().setDepth(201);
+    box.fillStyle(0x0d0d2a, 1); box.fillRoundedRect(W/2-bw/2,H/2-bh/2,bw,bh,16);
+    box.lineStyle(3, char.color, 1); box.strokeRoundedRect(W/2-bw/2,H/2-bh/2,bw,bh,16);
+    pop.push(box);
+
+    // Character sprite + name
+    const charSpr = this.add.image(W/2, H/2-72, char.id+'_md').setDepth(202);
+    const title = this.add.text(W/2, H/2-28, 'UNLOCK '+char.name.toUpperCase()+'?', {
+      fontSize:'18px', color:'#ffdd00', stroke:'#000', strokeThickness:3, fontStyle:'bold'
+    }).setOrigin(0.5).setDepth(202);
+    const desc = this.add.text(W/2, H/2+10, char.desc, {
+      fontSize:'11px', color:'#aaaacc', align:'center', wordWrap:{width:bw-30}
+    }).setOrigin(0.5).setDepth(202);
+    const costLine = this.add.text(W/2, H/2+44, `Cost: ${char.cost} coins   (You have: ${this.gd.coins})`, {
+      fontSize:'13px', color:'#ffdd99'
+    }).setOrigin(0.5).setDepth(202);
+    pop.push(charSpr, title, desc, costLine);
+
+    // Buttons
+    const unlockBtn = makeBtn(this, W/2-68, H/2+82, 120, 42, 'UNLOCK', 0x22cc44);
+    unlockBtn.setDepth(203);
+    unlockBtn.on('pointerup', () => {
+      this.gd.coins -= char.cost;
+      this.gd.unlocked.push(char.id);
+      saveData(this.gd);
+      close();
+      this.scene.restart();
+    });
+
+    const cancelBtn = makeBtn(this, W/2+68, H/2+82, 110, 42, 'CANCEL', 0x444466);
+    cancelBtn.setDepth(203);
+    cancelBtn.on('pointerup', close);
+
+    pop.push(unlockBtn, cancelBtn);
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+//  SHOP SCENE  (placeholder)
+// ─────────────────────────────────────────────────────────
+class ShopScene extends Phaser.Scene {
+  constructor() { super('ShopScene'); }
+
+  create() {
+    drawBG(this);
+    header(this,'SHOP');
+    coinBadge(this, W-75, 26, loadData().coins);
+
+    const items=[
+      {label:'Coin Pack',  sub:'500 Coins',      price:'FREE',   color:0xcc8800},
+      {label:'Gem Pack',   sub:'50 Gems',         price:'$0.99',  color:0x0055cc},
+      {label:'LCS Box',    sub:'Random Fighter',   price:'80 Gems',color:0x8800cc},
+      {label:'XP Boost',   sub:'2x XP  1 Hour',  price:'30 Gems',color:0xcc4400},
+    ];
+    const cw=Math.min(160,(W-80)/4), ch=Math.min(160,H*0.52);
+    const totalW=4*cw+3*12, sx=(W-totalW)/2, sy=H*0.3;
+    items.forEach((item,i)=>{
+      const cx=sx+i*(cw+12)+cw/2;
+      const g=this.add.graphics();
+      g.fillStyle(0x111133,0.9); g.fillRoundedRect(cx-cw/2,sy-ch/2,cw,ch,12);
+      g.lineStyle(2,item.color,0.7); g.strokeRoundedRect(cx-cw/2,sy-ch/2,cw,ch,12);
+      this.add.text(cx,sy-ch*0.27,item.label,{fontSize:'15px',color:'#fff',stroke:'#000',strokeThickness:3,fontStyle:'bold'}).setOrigin(0.5);
+      this.add.text(cx,sy,item.sub,{fontSize:'12px',color:'#aaaacc'}).setOrigin(0.5);
+      const pb=this.add.graphics();
+      pb.fillStyle(item.color,1); pb.fillRoundedRect(cx-46,sy+ch*0.3,92,28,8);
+      this.add.text(cx,sy+ch*0.3+14,item.price,{fontSize:'13px',color:'#fff',fontStyle:'bold'}).setOrigin(0.5);
+    });
+    this.add.text(W/2,H-22,'More items coming soon!',{fontSize:'14px',color:'#666688'}).setOrigin(0.5);
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+//  SETTINGS SCENE  (placeholder)
+// ─────────────────────────────────────────────────────────
+class SettingsScene extends Phaser.Scene {
+  constructor() { super('SettingsScene'); }
+
+  create() {
+    drawBG(this);
+    header(this,'SETTINGS');
+
+    const rows=[
+      {label:'Music',         val:'ON',      color:0x334488},
+      {label:'Sound Effects', val:'ON',      color:0x334488},
+      {label:'Notifications', val:'OFF',     color:0x443322},
+      {label:'Language',      val:'English', color:0x334433},
+      {label:'Account',       val:'Guest',   color:0x443344},
+    ];
+    const rw=Math.min(500,W-60), rh=50, sx=(W-rw)/2, sy=H*0.2;
+    rows.forEach((row,i)=>{
+      const y=sy+i*(rh+10);
+      const g=this.add.graphics();
+      g.fillStyle(row.color,0.85); g.fillRoundedRect(sx,y,rw,rh,10);
+      this.add.text(sx+18,y+rh/2,row.label,{fontSize:'16px',color:'#fff',stroke:'#000',strokeThickness:2}).setOrigin(0,0.5);
+      const vg=this.add.graphics();
+      vg.fillStyle(0x000000,0.3); vg.fillRoundedRect(sx+rw-112,y+(rh-30)/2,104,30,8);
+      this.add.text(sx+rw-60,y+rh/2,row.val,{fontSize:'14px',color:'#ffdd99',fontStyle:'bold'}).setOrigin(0.5);
+    });
+
+    // Reset save data button
+    const resetBtn = makeBtn(this, W/2, H-50, 200, 42, 'RESET SAVE DATA', 0x882222);
+    resetBtn.on('pointerup', () => {
+      localStorage.removeItem('br_coins');
+      localStorage.removeItem('br_unlocked');
+      this.scene.start('HomeScene');
+    });
+
+    this.add.text(W/2,H-15,'v0.1  Built with Phaser 3',{fontSize:'11px',color:'#444466'}).setOrigin(0.5);
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+//  GAME SCENE
+// ─────────────────────────────────────────────────────────
+class GameScene extends Phaser.Scene {
+  constructor() { super('GameScene'); }
+
+  create() {
+    this.WORLD={w:2400,h:2400};
+    this.physics.world.setBounds(0,0,this.WORLD.w,this.WORLD.h);
+    buildTextures(this);
+
+    this.ch = this.registry.get('selectedChar') || CHARS[0];
+    this.killCount = 0;
+
+    this.makeMap();
+    this.makePlayer();
+    this.makeEnemies(6);
+    this.pBullets = this.physics.add.group();
+    this.eBullets = this.physics.add.group();
+    this.lastShot = 0;
+    this.makeCollisions();
+
+    this.cameras.main.setBounds(0,0,this.WORLD.w,this.WORLD.h);
+    this.cameras.main.startFollow(this.player,true,0.09,0.09);
+
+    this.keys = this.input.keyboard.addKeys({
+      up:'W',down:'S',left:'A',right:'D',
+      aUp:'UP',aDown:'DOWN',aLeft:'LEFT',aRight:'RIGHT',fire:'SPACE'
+    });
+    this.lJoy={on:false,id:null,bx:0,by:0,dx:0,dy:0};
+    this.rJoy={on:false,id:null,bx:0,by:0,dx:0,dy:0};
+    this.input.on('pointerdown',this.touchDown,this);
+    this.input.on('pointermove',this.touchMove, this);
+    this.input.on('pointerup',  this.touchUp,   this);
+
+    this.makeUI();
+    this.gameOver=false;
+  }
+
+  // ─── MAP ─────────────────────────────────────────────
+
+  makeMap() {
+    const {w,h}=this.WORLD;
+    const bg=this.add.graphics();
+    bg.fillStyle(0x3a7a3a); bg.fillRect(0,0,w,h);
+    bg.lineStyle(1,0x2d6a2d,0.22);
+    for (let x=0;x<=w;x+=64) bg.lineBetween(x,0,x,h);
+    for (let y=0;y<=h;y+=64) bg.lineBetween(0,y,w,y);
+    this.add.graphics().lineStyle(8,0x111111,1).strokeRect(0,0,w,h);
+
+    this.walls=this.physics.add.staticGroup();
+    [
+      [320,280,192,64],[700,160,64,256],[1050,320,320,64],
+      [160,680,64,320],[560,560,160,160],[1200,200,256,64],
+      [1540,200,64,320],[1760,560,192,64],[1920,300,64,256],
+      [340,1100,256,64],[740,960,64,256],[1060,900,192,192],
+      [1440,760,64,256],[1760,960,256,64],[1920,1100,64,256],
+      [220,1500,192,64],[620,1380,64,256],[960,1260,320,64],
+      [1160,1560,256,64],[1540,1380,64,320],[1760,1460,192,192],
+      [460,1900,320,64],[960,1760,64,256],[1340,1880,256,64],[1860,1760,64,320],
+    ].forEach(([cx,cy,ww,wh])=>{
+      this.add.tileSprite(cx-ww/2,cy-wh/2,ww,wh,'wall').setOrigin(0);
+      const b=this.walls.create(cx,cy,'wall');
+      b.setVisible(false).setDisplaySize(ww,wh).refreshBody();
+    });
+  }
+
+  // ─── PLAYER ──────────────────────────────────────────
+
+  makePlayer() {
+    const cx=this.WORLD.w/2, cy=this.WORLD.h/2;
+    this.player=this.physics.add.sprite(cx,cy,this.ch.id+'_sm');
+    this.player.setCollideWorldBounds(true).setDepth(10);
+    this.player.health=this.ch.hp;
+    this.player.maxHealth=this.ch.hp;
+    this.nameTag=this.add.text(cx,cy-34,this.ch.name,{
+      fontSize:'13px',color:'#fff',stroke:'#000',strokeThickness:3
+    }).setOrigin(0.5,1).setDepth(11);
+  }
+
+  // ─── ENEMIES ─────────────────────────────────────────
+
+  makeEnemies(n) {
+    this.enemies=this.physics.add.group();
+    for (let i=0;i<n;i++) {
+      let x,y;
+      do {
+        x=Phaser.Math.Between(150,this.WORLD.w-150);
+        y=Phaser.Math.Between(150,this.WORLD.h-150);
+      } while(Phaser.Math.Distance.Between(x,y,this.player.x,this.player.y)<600);
+
+      // Pick a random character for this bot
+      const eChar = CHARS[Phaser.Math.Between(0, CHARS.length-1)];
+
+      const e = this.enemies.create(x, y, eChar.id+'_sm');
+      e.setCollideWorldBounds(true).setDepth(9);
+      e.botId     = i;
+      e.eChar     = eChar;
+      e.health    = eChar.hp;
+      e.maxHealth = eChar.hp;
+      e.lastShot  = 0;
+
+      // Name tag floats above the bot
+      e.label = this.add.text(x, y-34, eChar.name, {
+        fontSize:'11px', color:'#ffcccc', stroke:'#000000', strokeThickness:2
+      }).setOrigin(0.5,1).setDepth(10);
+    }
+  }
+
+  // ─── COLLISIONS ──────────────────────────────────────
+
+  makeCollisions() {
+    this.physics.add.collider(this.player,  this.walls);
+    this.physics.add.collider(this.enemies, this.walls);
+    this.physics.add.collider(this.pBullets,this.walls,b=>b.destroy());
+    this.physics.add.collider(this.eBullets,this.walls,b=>b.destroy());
+    this.physics.add.overlap(this.pBullets,this.enemies,this.hitEnemy,   null,this);
+    this.physics.add.overlap(this.eBullets,this.player, this.hitPlayer,  null,this);
+    this.physics.add.overlap(this.eBullets,this.enemies,this.hitBotByBot,null,this);
+  }
+
+  // ─── SHOOTING ────────────────────────────────────────
+
+  shootPlayer(x, y, dx, dy) {
+    const { atk, dmg, id } = this.ch;
+    const baseAng = Math.atan2(dy, dx);
+    const spd = 640 * atk.speedMult;
+
+    atk.angles.forEach(offset => {
+      const ang = baseAng + offset;
+      const b = this.pBullets.create(x, y, id+'_b');
+      b.setDepth(8).setScale(atk.scale);
+      b.setVelocity(Math.cos(ang)*spd, Math.sin(ang)*spd);
+      b.damage = dmg;
+      this.time.delayedCall(atk.life, ()=>{ if(b?.active) b.destroy(); });
+    });
+  }
+
+  shootEnemy(x, y, dx, dy, eChar, owner) {
+    const { atk, dmg, id } = eChar;
+    const baseAng = Math.atan2(dy, dx);
+    const spd = 640 * atk.speedMult;
+
+    atk.angles.forEach(offset => {
+      const ang = baseAng + offset;
+      const b = this.eBullets.create(x, y, id+'_b');
+      b.setDepth(8).setScale(atk.scale);
+      b.setVelocity(Math.cos(ang)*spd, Math.sin(ang)*spd);
+      b.damage   = dmg;
+      b.ownerBotId = owner?.botId ?? -1;
+      this.time.delayedCall(atk.life, ()=>{ if(b?.active) b.destroy(); });
+    });
+  }
+
+  // ─── HIT HANDLERS ────────────────────────────────────
+
+  hitEnemy(bullet, enemy) {
+    bullet.destroy();
+    enemy.health -= bullet.damage;
+    this.tweens.add({targets:enemy,alpha:0.1,duration:60,yoyo:true});
+    if (enemy.health <= 0) {
+      if (enemy.label) enemy.label.destroy();
+      enemy.destroy();
+      this.killCount++;
+      const left = this.enemies.getChildren().length;
+      this.cntLabel.setText('Enemies: '+left);
+      if (left === 0) this.endGame(true);
+    }
+  }
+
+  hitPlayer(player, bullet) {
+    if (this.gameOver) return;
+    bullet.destroy();
+    this.player.health = Math.max(0, this.player.health - bullet.damage);
+    this.tweens.add({targets:this.player,alpha:0.1,duration:80,yoyo:true});
+    if (this.player.health === 0) this.endGame(false);
+  }
+
+  hitBotByBot(bullet, enemy) {
+    if (bullet.ownerBotId === enemy.botId) return;
+    bullet.destroy();
+    enemy.health -= bullet.damage;
+    this.tweens.add({targets:enemy,alpha:0.1,duration:60,yoyo:true});
+    if (enemy.health <= 0) {
+      if (enemy.label) enemy.label.destroy();
+      enemy.destroy();
+      const left = this.enemies.getChildren().length;
+      this.cntLabel.setText('Enemies: '+left);
+      if (left === 0) this.endGame(true);
+    }
+  }
+
+  // ─── END GAME ────────────────────────────────────────
+
+  endGame(won) {
+    if (this.gameOver) return;
+    this.gameOver = true;
+    this.physics.pause();
+
+    // Save coins earned
+    const earned = this.killCount * 15 + (won ? 80 : 0);
+    const data = loadData();
+    data.coins += earned;
+    saveData(data);
+
+    // Overlay
+    this.add.graphics().fillStyle(0x000000,0.55).fillRect(0,0,W,H).setScrollFactor(0).setDepth(199);
+
+    this.add.text(W/2, H/2-56, won?'VICTORY!':'DEFEATED!', {
+      fontSize:'58px', color:won?'#ffdd00':'#ff4444', stroke:'#000', strokeThickness:8
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
+
+    this.add.text(W/2, H/2+8, won?'All enemies cleared!':'You were knocked out!', {
+      fontSize:'20px', color:'#ffffff', stroke:'#000', strokeThickness:4
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
+
+    this.add.text(W/2, H/2+38, `+${earned} COINS  (${this.killCount} kills${won?' + win bonus':''})`, {
+      fontSize:'16px', color:'#ffdd00', stroke:'#000', strokeThickness:3
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
+
+    this.add.text(W/2, H/2+76, 'Tap to return home', {
+      fontSize:'17px', color:'#bbbbbb'
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
+
+    this.time.delayedCall(900, ()=>{
+      this.input.once('pointerdown', ()=>this.scene.start('HomeScene'));
+    });
+  }
+
+  // ─── UI ──────────────────────────────────────────────
+
+  makeUI() {
+    this.hpBg  = this.add.graphics().setScrollFactor(0).setDepth(100);
+    this.hpFg  = this.add.graphics().setScrollFactor(0).setDepth(101);
+    this.joyFx = this.add.graphics().setScrollFactor(0).setDepth(99);
+    this.add.text(22,H-55,'HP',{fontSize:'13px',color:'#ff8888',stroke:'#000',strokeThickness:2}).setScrollFactor(0).setDepth(102);
+    this.cntLabel = this.add.text(W/2,16,'Enemies: 6',{
+      fontSize:'20px',color:'#fff',stroke:'#000',strokeThickness:4
+    }).setOrigin(0.5,0).setScrollFactor(0).setDepth(100);
+    const hint = this.add.text(W/2,H-26,'Left: move   Right: aim & shoot',{
+      fontSize:'13px',color:'#cccccc',stroke:'#000',strokeThickness:2
+    }).setOrigin(0.5,1).setScrollFactor(0).setDepth(100);
+    this.time.delayedCall(3200,()=>this.tweens.add({targets:hint,alpha:0,duration:800}));
+  }
+
+  // ─── TOUCH ───────────────────────────────────────────
+
+  touchDown(p) {
+    const j=p.x<W/2?this.lJoy:this.rJoy;
+    if(!j.on) Object.assign(j,{on:true,id:p.id,bx:p.x,by:p.y,dx:0,dy:0});
+  }
+  touchMove(p) {
+    [this.lJoy,this.rJoy].forEach(j=>{
+      if(!j.on||j.id!==p.id) return;
+      const dx=p.x-j.bx,dy=p.y-j.by,len=Math.hypot(dx,dy),max=55;
+      j.dx=len>max?dx/len*max:dx;
+      j.dy=len>max?dy/len*max:dy;
+    });
+  }
+  touchUp(p) {
+    [this.lJoy,this.rJoy].forEach(j=>{
+      if(j.on&&j.id===p.id) Object.assign(j,{on:false,dx:0,dy:0});
+    });
+  }
+
+  // ─── DRAW HELPERS ────────────────────────────────────
+
+  drawHP() {
+    this.hpBg.clear(); this.hpFg.clear();
+    const x=22,y=H-38,bw=200,bh=16;
+    this.hpBg.fillStyle(0x000000,0.65); this.hpBg.fillRoundedRect(x,y,bw,bh,8);
+    const pct=this.player.health/this.player.maxHealth;
+    const col=pct>0.5?0x33ee55:pct>0.25?0xffaa00:0xff3300;
+    this.hpFg.fillStyle(col,1);
+    this.hpFg.fillRoundedRect(x+2,y+2,Math.max(0,(bw-4)*pct),bh-4,6);
+  }
+
+  drawJoysticks() {
+    this.joyFx.clear();
+    [this.lJoy,this.rJoy].forEach(j=>{
+      if(!j.on) return;
+      this.joyFx.fillStyle(0xffffff,0.1);   this.joyFx.fillCircle(j.bx,j.by,55);
+      this.joyFx.lineStyle(2,0xffffff,0.3); this.joyFx.strokeCircle(j.bx,j.by,55);
+      this.joyFx.fillStyle(0xffffff,0.35);  this.joyFx.fillCircle(j.bx+j.dx,j.by+j.dy,27);
+    });
+  }
+
+  // ─── UPDATE ──────────────────────────────────────────
+
+  update(time) {
+    if (this.gameOver) return;
+
+    const spd = this.ch.spd;
+    let vx=0, vy=0;
+    const k = this.keys;
+    if(k.left.isDown ||k.aLeft.isDown)  vx-=spd;
+    if(k.right.isDown||k.aRight.isDown) vx+=spd;
+    if(k.up.isDown   ||k.aUp.isDown)    vy-=spd;
+    if(k.down.isDown ||k.aDown.isDown)  vy+=spd;
+    if(this.lJoy.on){
+      const len=Math.hypot(this.lJoy.dx,this.lJoy.dy);
+      if(len>8){vx=this.lJoy.dx/55*spd; vy=this.lJoy.dy/55*spd;}
+    }
+    this.player.setVelocity(vx,vy);
+    if(vx||vy) this.player.setRotation(Math.atan2(vy,vx));
+
+    // Shoot — uses character's cooldown
+    const cd = this.ch.atk.cooldown;
+    const rLen = Math.hypot(this.rJoy.dx,this.rJoy.dy);
+    if(this.rJoy.on && rLen>15 && time-this.lastShot > cd){
+      this.shootPlayer(this.player.x, this.player.y, this.rJoy.dx, this.rJoy.dy);
+      this.lastShot = time;
+    }
+    if(k.fire.isDown && (vx||vy) && time-this.lastShot > cd){
+      this.shootPlayer(this.player.x, this.player.y, vx, vy);
+      this.lastShot = time;
+    }
+
+    // Enemy AI — each bot targets the nearest entity (player or other bot)
+    this.enemies.getChildren().forEach(e=>{
+      let targetX = this.player.x, targetY = this.player.y;
+      let nearestDist = Phaser.Math.Distance.Between(e.x,e.y,this.player.x,this.player.y);
+
+      this.enemies.getChildren().forEach(other=>{
+        if (other===e) return;
+        const d = Phaser.Math.Distance.Between(e.x,e.y,other.x,other.y);
+        if (d < nearestDist) { nearestDist=d; targetX=other.x; targetY=other.y; }
+      });
+
+      const dx=targetX-e.x, dy=targetY-e.y;
+      const ang=Math.atan2(dy,dx);
+      const eSpd=e.eChar.spd;
+      e.setVelocity(nearestDist>180?Math.cos(ang)*eSpd:0, nearestDist>180?Math.sin(ang)*eSpd:0);
+
+      const eCd=e.eChar.atk.cooldown;
+      if(nearestDist<600 && time-e.lastShot>eCd){
+        this.shootEnemy(e.x,e.y,dx,dy,e.eChar,e);
+        e.lastShot=time;
+      }
+      if(e.label) e.label.setPosition(e.x,e.y-34);
+    });
+
+    this.nameTag.setPosition(this.player.x, this.player.y-34);
+    this.drawHP();
+    this.drawJoysticks();
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+//  LAUNCH
+// ─────────────────────────────────────────────────────────
+new Phaser.Game({
+  type: Phaser.AUTO,
+  width: W, height: H,
+  backgroundColor: '#080818',
+  physics: { default:'arcade', arcade:{gravity:{y:0},debug:false} },
+  scene: [HomeScene, CharSelectScene, ShopScene, SettingsScene, GameScene],
+  scale: { mode:Phaser.Scale.FIT, autoCenter:Phaser.Scale.CENTER_BOTH }
+});
+</script>
+</body>
+</html>
