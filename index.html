@@ -636,7 +636,7 @@ class GameScene extends Phaser.Scene {
     this.player.setCollideWorldBounds(true).setDepth(10);
     this.player.health=this.ch.hp;
     this.player.maxHealth=this.ch.hp;
-    this.nameTag=this.add.text(cx,cy-34,this.ch.name,{
+    this.nameTag=this.add.text(cx,cy-50,this.ch.name,{
       fontSize:'13px',color:'#fff',stroke:'#000',strokeThickness:3
     }).setOrigin(0.5,1).setDepth(11);
   }
@@ -661,10 +661,14 @@ class GameScene extends Phaser.Scene {
       e.eChar     = eChar;
       e.health    = eChar.hp;
       e.maxHealth = eChar.hp;
-      e.lastShot  = 0;
+      e.lastShot    = 0;
+      e.wanderAngle = Math.random() * Math.PI * 2;
+      e.wanderTimer = 0;
+      e.stuckTimer  = 0;
+      e.lastPos     = { x, y };
 
       // Name tag floats above the bot
-      e.label = this.add.text(x, y-34, eChar.name, {
+      e.label = this.add.text(x, y-50, eChar.name, {
         fontSize:'11px', color:'#ffcccc', stroke:'#000000', strokeThickness:2
       }).setOrigin(0.5,1).setDepth(10);
     }
@@ -689,6 +693,15 @@ class GameScene extends Phaser.Scene {
       const b = w.body;
       return px >= b.x && px <= b.x + b.width && py >= b.y && py <= b.y + b.height;
     });
+  }
+
+  segmentHitsWall(x1, y1, x2, y2) {
+    const steps = 10;
+    for (let i = 1; i < steps; i++) {
+      const t = i / steps;
+      if (this.pointInWall(x1 + (x2-x1)*t, y1 + (y2-y1)*t)) return true;
+    }
+    return false;
   }
 
   shootPlayer(x, y, dx, dy) {
@@ -817,9 +830,10 @@ class GameScene extends Phaser.Scene {
   // ─── UI ──────────────────────────────────────────────
 
   makeUI() {
-    this.hpBg  = this.add.graphics().setScrollFactor(0).setDepth(100);
-    this.hpFg  = this.add.graphics().setScrollFactor(0).setDepth(101);
-    this.joyFx = this.add.graphics().setScrollFactor(0).setDepth(99);
+    this.hpBg     = this.add.graphics().setScrollFactor(0).setDepth(100);
+    this.hpFg     = this.add.graphics().setScrollFactor(0).setDepth(101);
+    this.joyFx    = this.add.graphics().setScrollFactor(0).setDepth(99);
+    this.worldHpGfx = this.add.graphics().setDepth(15);
 
     // Fixed joystick base rings (always visible)
     const joyBases = this.add.graphics().setScrollFactor(0).setDepth(98);
@@ -875,6 +889,19 @@ class GameScene extends Phaser.Scene {
     const col=pct>0.5?0x33ee55:pct>0.25?0xffaa00:0xff3300;
     this.hpFg.fillStyle(col,1);
     this.hpFg.fillRoundedRect(x+2,y+2,Math.max(0,(bw-4)*pct),bh-4,4);
+  }
+
+  drawWorldHP() {
+    this.worldHpGfx.clear();
+    const bar = (x, y, hp, maxHp) => {
+      const bw=44, bh=5, bx=x-bw/2, by=y-54;
+      const pct = Math.max(0, hp/maxHp);
+      const col = pct>0.5 ? 0x33ee55 : pct>0.25 ? 0xffaa00 : 0xff3300;
+      this.worldHpGfx.fillStyle(0x000000, 0.7); this.worldHpGfx.fillRect(bx-1,by-1,bw+2,bh+2);
+      this.worldHpGfx.fillStyle(col, 1);         this.worldHpGfx.fillRect(bx,by,bw*pct,bh);
+    };
+    bar(this.player.x, this.player.y, this.player.health, this.player.maxHealth);
+    this.enemies.getChildren().forEach(e => bar(e.x, e.y, e.health, e.maxHealth));
   }
 
   drawControls() {
@@ -938,35 +965,68 @@ class GameScene extends Phaser.Scene {
       this.lastShot = time;
     }
 
-    // Enemy AI — each bot targets the nearest entity (player or other bot)
-    this.enemies.getChildren().forEach(e=>{
+    // Enemy AI
+    this.enemies.getChildren().forEach(e => {
+      // Find nearest target
       let targetX = this.player.x, targetY = this.player.y;
-      let nearestDist = Phaser.Math.Distance.Between(e.x,e.y,this.player.x,this.player.y);
-
-      this.enemies.getChildren().forEach(other=>{
-        if (other===e) return;
-        const d = Phaser.Math.Distance.Between(e.x,e.y,other.x,other.y);
-        if (d < nearestDist) { nearestDist=d; targetX=other.x; targetY=other.y; }
+      let nearestDist = Phaser.Math.Distance.Between(e.x, e.y, this.player.x, this.player.y);
+      this.enemies.getChildren().forEach(other => {
+        if (other === e) return;
+        const d = Phaser.Math.Distance.Between(e.x, e.y, other.x, other.y);
+        if (d < nearestDist) { nearestDist = d; targetX = other.x; targetY = other.y; }
       });
 
-      const dx=targetX-e.x, dy=targetY-e.y;
-      const ang=Math.atan2(dy,dx);
-      const eSpd=e.eChar.spd;
-      e.setVelocity(nearestDist>180?Math.cos(ang)*eSpd:0, nearestDist>180?Math.sin(ang)*eSpd:0);
+      const dx = targetX - e.x, dy = targetY - e.y;
+      const toTargetAng = Math.atan2(dy, dx);
+      const hasLOS = !this.segmentHitsWall(e.x, e.y, targetX, targetY);
+      const eSpd = e.eChar.spd;
 
-      const eCd=e.eChar.atk.cooldown;
-      if(nearestDist<600 && time-e.lastShot>eCd){
-        // Inaccuracy: small at close range, large at distance
-        const spread = Math.min(0.6, 0.1 + nearestDist / 1000);
-        const aimAng = Math.atan2(dy,dx) + (Math.random()-0.5)*2*spread;
-        this.shootEnemy(e.x,e.y,Math.cos(aimAng),Math.sin(aimAng),e.eChar,e);
-        e.lastShot=time;
+      // Periodically shift wander direction
+      if (time > e.wanderTimer) {
+        e.wanderAngle += (Math.random() - 0.5) * Math.PI * 1.5;
+        e.wanderTimer = time + 1200 + Math.random() * 1800;
       }
-      if(e.label) e.label.setPosition(e.x,e.y-34);
+
+      // Stuck detection — if barely moving, break out with a new wander angle
+      const moved = Math.hypot(e.x - e.lastPos.x, e.y - e.lastPos.y);
+      if (moved < 3) {
+        e.stuckTimer++;
+        if (e.stuckTimer > 25) {
+          e.wanderAngle = toTargetAng + (Math.random() > 0.5 ? 1 : -1) * (0.9 + Math.random() * 0.7);
+          e.wanderTimer = time + 600;
+          e.stuckTimer  = 0;
+        }
+      } else { e.stuckTimer = 0; }
+      e.lastPos = { x: e.x, y: e.y };
+
+      // Movement: navigate around walls, strafe in combat, wander when blocked
+      let moveAng;
+      if (!hasLOS) {
+        moveAng = e.wanderAngle; // wall in the way — navigate around it
+      } else if (nearestDist > 380) {
+        moveAng = toTargetAng + (Math.random() - 0.5) * 0.5; // close in loosely
+      } else if (nearestDist > 150) {
+        moveAng = toTargetAng + (Math.random() - 0.5) * 1.2; // strafe in combat
+      } else {
+        moveAng = toTargetAng + Math.PI + (Math.random() - 0.5) * 0.6; // back away
+      }
+      e.setVelocity(Math.cos(moveAng) * eSpd, Math.sin(moveAng) * eSpd);
+      e.setRotation(hasLOS ? toTargetAng : moveAng);
+
+      // Only shoot when line-of-sight is clear
+      const eCd = e.eChar.atk.cooldown;
+      if (hasLOS && nearestDist < 600 && time - e.lastShot > eCd) {
+        const spread = Math.min(0.6, 0.1 + nearestDist / 1000);
+        const aimAng = toTargetAng + (Math.random() - 0.5) * 2 * spread;
+        this.shootEnemy(e.x, e.y, Math.cos(aimAng), Math.sin(aimAng), e.eChar, e);
+        e.lastShot = time;
+      }
+      if (e.label) e.label.setPosition(e.x, e.y - 50);
     });
 
-    this.nameTag.setPosition(this.player.x, this.player.y-34);
+    this.nameTag.setPosition(this.player.x, this.player.y-50);
     this.drawHP();
+    this.drawWorldHP();
     this.drawControls();
   }
 }
