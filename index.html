@@ -551,10 +551,11 @@ class GameScene extends Phaser.Scene {
       up:'W',down:'S',left:'A',right:'D',
       aUp:'UP',aDown:'DOWN',aLeft:'LEFT',aRight:'RIGHT',fire:'SPACE'
     });
-    this.lJoyBase = { x: 90, y: H - 85 };
-    this.rJoyBase = { x: W - 90, y: H - 85 };
-    this.lJoy={on:false,id:null,bx:0,by:0,dx:0,dy:0};
-    this.rJoy={on:false,id:null,bx:0,by:0,dx:0,dy:0};
+    this.lJoyBase   = { x: 90, y: H - 85 };
+    this.fireBtnPos = { x: W - 90, y: H - 85 };
+    this.lJoy     = { on:false, id:null, bx:0, by:0, dx:0, dy:0 };
+    this.fireBtn  = { on:false, id:null };
+    this.lastFacing = { x:1, y:0 };
     this.input.on('pointerdown',this.touchDown,this);
     this.input.on('pointermove',this.touchMove, this);
     this.input.on('pointerup',  this.touchUp,   this);
@@ -762,16 +763,18 @@ class GameScene extends Phaser.Scene {
 
     // Fixed joystick base rings (always visible)
     const joyBases = this.add.graphics().setScrollFactor(0).setDepth(98);
+    // Move joystick ring (left)
     joyBases.fillStyle(0xffffff, 0.07); joyBases.fillCircle(this.lJoyBase.x, this.lJoyBase.y, 60);
     joyBases.lineStyle(2, 0xffffff, 0.25); joyBases.strokeCircle(this.lJoyBase.x, this.lJoyBase.y, 60);
-    joyBases.fillStyle(0xffffff, 0.07); joyBases.fillCircle(this.rJoyBase.x, this.rJoyBase.y, 60);
-    joyBases.lineStyle(2, 0xffffff, 0.25); joyBases.strokeCircle(this.rJoyBase.x, this.rJoyBase.y, 60);
     this.add.text(this.lJoyBase.x, this.lJoyBase.y + 68, 'MOVE', {
       fontSize:'11px', color:'#ffffff66', stroke:'#000', strokeThickness:1
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(98);
-    this.add.text(this.rJoyBase.x, this.rJoyBase.y + 68, 'SHOOT', {
-      fontSize:'11px', color:'#ffffff66', stroke:'#000', strokeThickness:1
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(98);
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(103);
+    // Fire button ring (right, red tint)
+    joyBases.fillStyle(0xff2200, 0.18); joyBases.fillCircle(this.fireBtnPos.x, this.fireBtnPos.y, 55);
+    joyBases.lineStyle(3, 0xff5500, 0.7); joyBases.strokeCircle(this.fireBtnPos.x, this.fireBtnPos.y, 55);
+    this.add.text(this.fireBtnPos.x, this.fireBtnPos.y, 'FIRE', {
+      fontSize:'18px', color:'#ff8866', fontStyle:'bold', stroke:'#000', strokeThickness:3
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(103);
 
     // HP (top-left)
     this.add.text(16, 4, 'HP', {fontSize:'11px',color:'#ff8888',stroke:'#000',strokeThickness:2}).setScrollFactor(0).setDepth(102);
@@ -784,25 +787,22 @@ class GameScene extends Phaser.Scene {
 
   touchDown(p) {
     const dL = Phaser.Math.Distance.Between(p.x, p.y, this.lJoyBase.x, this.lJoyBase.y);
-    const dR = Phaser.Math.Distance.Between(p.x, p.y, this.rJoyBase.x, this.rJoyBase.y);
+    const dF = Phaser.Math.Distance.Between(p.x, p.y, this.fireBtnPos.x, this.fireBtnPos.y);
     if (!this.lJoy.on && dL <= 100) {
       Object.assign(this.lJoy, { on:true, id:p.id, bx:this.lJoyBase.x, by:this.lJoyBase.y, dx:0, dy:0 });
-    } else if (!this.rJoy.on && dR <= 100) {
-      Object.assign(this.rJoy, { on:true, id:p.id, bx:this.rJoyBase.x, by:this.rJoyBase.y, dx:0, dy:0 });
+    } else if (!this.fireBtn.on && dF <= 90) {
+      Object.assign(this.fireBtn, { on:true, id:p.id });
     }
   }
   touchMove(p) {
-    [this.lJoy,this.rJoy].forEach(j=>{
-      if(!j.on||j.id!==p.id) return;
-      const dx=p.x-j.bx,dy=p.y-j.by,len=Math.hypot(dx,dy),max=55;
-      j.dx=len>max?dx/len*max:dx;
-      j.dy=len>max?dy/len*max:dy;
-    });
+    if (!this.lJoy.on || this.lJoy.id !== p.id) return;
+    const dx=p.x-this.lJoy.bx, dy=p.y-this.lJoy.by, len=Math.hypot(dx,dy), max=55;
+    this.lJoy.dx = len>max ? dx/len*max : dx;
+    this.lJoy.dy = len>max ? dy/len*max : dy;
   }
   touchUp(p) {
-    [this.lJoy,this.rJoy].forEach(j=>{
-      if(j.on&&j.id===p.id) Object.assign(j,{on:false,dx:0,dy:0});
-    });
+    if (this.lJoy.on   && this.lJoy.id   === p.id) Object.assign(this.lJoy, {on:false, dx:0, dy:0});
+    if (this.fireBtn.on && this.fireBtn.id === p.id) this.fireBtn.on = false;
   }
 
   // ─── DRAW HELPERS ────────────────────────────────────
@@ -817,17 +817,18 @@ class GameScene extends Phaser.Scene {
     this.hpFg.fillRoundedRect(x+2,y+2,Math.max(0,(bw-4)*pct),bh-4,4);
   }
 
-  drawJoysticks() {
+  drawControls() {
     this.joyFx.clear();
-    [
-      { joy:this.lJoy, base:this.lJoyBase },
-      { joy:this.rJoy, base:this.rJoyBase }
-    ].forEach(({ joy, base }) => {
-      const sx = base.x + (joy.on ? joy.dx : 0);
-      const sy = base.y + (joy.on ? joy.dy : 0);
-      this.joyFx.fillStyle(0xffffff, joy.on ? 0.45 : 0.18);
-      this.joyFx.fillCircle(sx, sy, 26);
-    });
+    // Left joystick stick dot
+    const sx = this.lJoyBase.x + (this.lJoy.on ? this.lJoy.dx : 0);
+    const sy = this.lJoyBase.y + (this.lJoy.on ? this.lJoy.dy : 0);
+    this.joyFx.fillStyle(0xffffff, this.lJoy.on ? 0.45 : 0.18);
+    this.joyFx.fillCircle(sx, sy, 26);
+    // Fire button press highlight
+    if (this.fireBtn.on) {
+      this.joyFx.fillStyle(0xff5500, 0.55);
+      this.joyFx.fillCircle(this.fireBtnPos.x, this.fireBtnPos.y, 55);
+    }
   }
 
   // ─── UPDATE ──────────────────────────────────────────
@@ -849,14 +850,30 @@ class GameScene extends Phaser.Scene {
     this.player.setVelocity(vx,vy);
     if(vx||vy) this.player.setRotation(Math.atan2(vy,vx));
 
-    // Shoot — uses character's cooldown
+    // Track last facing direction from movement; auto-aim when standing still + firing
+    if (vx || vy) {
+      const len = Math.hypot(vx, vy);
+      this.lastFacing.x = vx/len; this.lastFacing.y = vy/len;
+    } else if (this.fireBtn.on) {
+      let nearest = null, nearDist = Infinity;
+      this.enemies.getChildren().forEach(e => {
+        const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, e.x, e.y);
+        if (d < nearDist) { nearDist = d; nearest = e; }
+      });
+      if (nearest) {
+        const dx = nearest.x - this.player.x, dy = nearest.y - this.player.y;
+        const len = Math.hypot(dx, dy);
+        this.lastFacing.x = dx/len; this.lastFacing.y = dy/len;
+      }
+    }
+
+    // Shoot
     const cd = this.ch.atk.cooldown;
-    const rLen = Math.hypot(this.rJoy.dx,this.rJoy.dy);
-    if(this.rJoy.on && rLen>15 && time-this.lastShot > cd){
-      this.shootPlayer(this.player.x, this.player.y, this.rJoy.dx, this.rJoy.dy);
+    if (this.fireBtn.on && time - this.lastShot > cd) {
+      this.shootPlayer(this.player.x, this.player.y, this.lastFacing.x, this.lastFacing.y);
       this.lastShot = time;
     }
-    if(k.fire.isDown && (vx||vy) && time-this.lastShot > cd){
+    if (k.fire.isDown && (vx||vy) && time - this.lastShot > cd) {
       this.shootPlayer(this.player.x, this.player.y, vx, vy);
       this.lastShot = time;
     }
@@ -887,7 +904,7 @@ class GameScene extends Phaser.Scene {
 
     this.nameTag.setPosition(this.player.x, this.player.y-34);
     this.drawHP();
-    this.drawJoysticks();
+    this.drawControls();
   }
 }
 
