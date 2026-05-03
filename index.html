@@ -230,20 +230,22 @@ function makeBtn(scene, x, y, w, h, label, color=0xee8800) {
   return c;
 }
 
-function coinBadge(scene, x, y, coins) {
+function coinBadge(scene, x, y, coins, depth=0) {
   const g = scene.add.graphics();
   g.fillStyle(0x221100,0.85); g.fillRoundedRect(x-60,y-15,120,30,8);
+  g.setDepth(depth);
   scene.add.text(x, y, `COINS: ${coins}`, {
     fontSize:'13px', color:'#ffdd00', stroke:'#000', strokeThickness:2, fontStyle:'bold'
-  }).setOrigin(0.5);
+  }).setOrigin(0.5).setDepth(depth);
 }
 
-function header(scene, title) {
+function header(scene, title, depth=0) {
   scene.add.text(W/2,28,title,{
     fontSize:'26px', color:'#ffdd00',
     stroke:'#000000', strokeThickness:5, fontStyle:'bold'
-  }).setOrigin(0.5,0.5);
+  }).setOrigin(0.5,0.5).setDepth(depth);
   const b = makeBtn(scene,55,28,90,38,'< BACK',0x334466);
+  b.setDepth(depth);
   b.on('pointerup',()=>scene.scene.start('HomeScene'));
 }
 
@@ -323,20 +325,37 @@ class CharSelectScene extends Phaser.Scene {
   create() {
     buildTextures(this);
     drawBG(this);
-    header(this, 'SELECT FIGHTER');
 
     this.gd = loadData();
-    coinBadge(this, W-75, 26, this.gd.coins);
+    this.cards = [];
+    this.scrollOffset = 0;
+    this.isDragging   = false;
 
     // Default selection — first unlocked char
     const saved = this.registry.get('selectedChar');
     this.selIdx = CHARS.findIndex(c => c.id === saved?.id && this.gd.unlocked.includes(c.id));
     if (this.selIdx < 0) this.selIdx = CHARS.findIndex(c => this.gd.unlocked.includes(c.id));
 
-    this.cards = [];
     this.buildGrid();
 
+    // Mask panels — solid background rects that hide cards scrolling out of view
+    const BG = 0x080818;
+    this.add.graphics().fillStyle(BG,1).fillRect(0,0,W,58).setDepth(20);
+    this.add.graphics().fillStyle(BG,1).fillRect(0,H-68,W,68).setDepth(20);
+
+    // Scroll hint (hidden once fully scrolled down)
+    this.scrollHint = this.add.text(W/2, H-72, '▼  scroll for more  ▼', {
+      fontSize:'11px', color:'#ffffff55'
+    }).setOrigin(0.5,1).setDepth(22);
+    this.scrollHint.setVisible(this.maxScroll > 5);
+
+    // Header and coin badge drawn above the mask panels
+    header(this, 'SELECT FIGHTER', 21);
+    coinBadge(this, W-75, 26, this.gd.coins, 21);
+
+    // Play button above mask
     const playBtn = makeBtn(this, W/2, H-34, 210, 52, 'PLAY', 0x22cc44);
+    playBtn.setDepth(21);
     playBtn.on('pointerup', () => {
       this.registry.set('selectedChar', CHARS[this.selIdx]);
       this.scene.start('GameScene');
@@ -346,29 +365,49 @@ class CharSelectScene extends Phaser.Scene {
   }
 
   buildGrid() {
-    const cols = CHARS.length <= 6 ? 3 : 5;
+    const cols = 3;
     const rows = Math.ceil(CHARS.length / cols);
-    const cw = Math.min(160,(W-60)/cols);
-    const ch = Math.min(140,(H-130)/rows);
-    const gx=12, gy=10;
-    const totalW = cols*cw+(cols-1)*gx;
-    const totalH = rows*ch+(rows-1)*gy;
+    const cw = Math.min(160, (W-60)/cols);
+    const ch = 130;
+    const gx = 12, gy = 10;
+    const totalW = cols*cw + (cols-1)*gx;
+    const totalH = rows*ch + (rows-1)*gy;
     const sx = (W-totalW)/2;
-    const sy = 58 + (H-58-78-totalH)/2 + 8;
+    const headerH = 58, footerH = 68;
+    const viewH = H - headerH - footerH;
+    this.maxScroll = Math.max(0, totalH + 16 - viewH);
 
     CHARS.forEach((c,i) => {
-      const col=i%cols, row=Math.floor(i/cols);
-      const cx = sx+col*(cw+gx)+cw/2;
-      const cy = sy+row*(ch+gy)+ch/2;
+      const col = i%cols, row = Math.floor(i/cols);
+      const cx = sx + col*(cw+gx) + cw/2;
+      const cy = headerH + row*(ch+gy) + ch/2 + 8;
       this.makeCard(cx, cy, cw, ch, c, i);
     });
+
+    // Touch scroll
+    let dragStartY = 0, dragStartOffset = 0;
+    this.input.on('pointerdown', p => {
+      dragStartY = p.y; dragStartOffset = this.scrollOffset;
+    });
+    this.input.on('pointermove', p => {
+      if (!p.isDown) return;
+      if (Math.abs(p.y - dragStartY) > 8) this.isDragging = true;
+      if (!this.isDragging) return;
+      const next = Phaser.Math.Clamp(dragStartOffset + (dragStartY - p.y), 0, this.maxScroll);
+      if (Math.abs(next - this.scrollOffset) > 0.5) {
+        this.scrollOffset = next;
+        this.cards.forEach(({ con, baseY }) => { con.y = baseY - this.scrollOffset; });
+        if (this.scrollHint) this.scrollHint.setVisible(this.scrollOffset < this.maxScroll - 5);
+      }
+    });
+    this.input.on('pointerup', () => { this.isDragging = false; });
   }
 
   makeCard(cx, cy, cw, ch, char, idx) {
     const isUnlocked = this.gd.unlocked.includes(char.id);
     const canAfford  = !isUnlocked && this.gd.coins >= char.cost;
 
-    const con = this.add.container(cx, cy);
+    const con = this.add.container(cx, cy).setDepth(5);
     const bg = this.add.graphics();
     bg.fillStyle(0x111122, 0.92);
     bg.fillRoundedRect(-cw/2,-ch/2,cw,ch,12);
@@ -385,7 +424,7 @@ class CharSelectScene extends Phaser.Scene {
 
     if (isUnlocked) {
       con.setInteractive(new Phaser.Geom.Rectangle(-cw/2,-ch/2,cw,ch), Phaser.Geom.Rectangle.Contains);
-      con.on('pointerup', () => { this.selIdx=idx; this.refreshBorders(); });
+      con.on('pointerup', () => { if (!this.isDragging) { this.selIdx=idx; this.refreshBorders(); } });
       con.on('pointerover',()=>this.tweens.add({targets:con,scaleX:1.04,scaleY:1.04,duration:80}));
       con.on('pointerout', ()=>this.tweens.add({targets:con,scaleX:1,scaleY:1,duration:80}));
     } else {
@@ -414,13 +453,13 @@ class CharSelectScene extends Phaser.Scene {
 
       if (canAfford) {
         con.setInteractive(new Phaser.Geom.Rectangle(-cw/2,-ch/2,cw,ch), Phaser.Geom.Rectangle.Contains);
-        con.on('pointerup', () => this.showUnlockPopup(char));
+        con.on('pointerup', () => { if (!this.isDragging) this.showUnlockPopup(char); });
         con.on('pointerover',()=>this.tweens.add({targets:con,scaleX:1.04,scaleY:1.04,duration:80}));
         con.on('pointerout', ()=>this.tweens.add({targets:con,scaleX:1,scaleY:1,duration:80}));
       }
     }
 
-    this.cards.push({ con, border, char, cw, ch });
+    this.cards.push({ con, border, char, cw, ch, baseY: cy });
   }
 
   refreshBorders() {
