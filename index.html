@@ -387,14 +387,15 @@ class HomeScene extends Phaser.Scene {
 
     // Bottom nav
     const navY = H*0.91;
-    const gap  = Math.min(148, W*0.17);
-    const chars = makeBtn(this, W/2-gap, navY, 120, 42, 'CHARACTERS', 0x2255cc);
+    const navGap = Math.min(148, W*0.17);
+    const chars = makeBtn(this, W/2-navGap, navY, 120, 42, 'CHARACTERS', 0x2255cc);
     chars.on('pointerup', () => this.scene.start('CharSelectScene'));
     const shop = makeBtn(this, W/2, navY, 100, 42, 'SHOP', 0xcc5500);
     shop.on('pointerup', () => this.scene.start('ShopScene'));
-    const sett = makeBtn(this, W/2+gap, navY, 110, 42, 'SETTINGS', 0x445566);
+    const sett = makeBtn(this, W/2+navGap, navY, 110, 42, 'SETTINGS', 0x445566);
     sett.on('pointerup', () => this.scene.start('SettingsScene'));
 
+    this.add.text(W/2, H-8, '© 2026 William Drye', {fontSize:'11px',color:'#444466'}).setOrigin(0.5,1);
     this.add.text(W-8,H-8,'v.b1c7ca4',{fontSize:'11px',color:'#555577'}).setOrigin(1,1);
   }
 }
