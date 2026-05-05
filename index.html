@@ -378,8 +378,10 @@ class HomeScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // PLAY — centered, lower
-    const play = makeBtn(this, W/2, H*0.74, 240, 62, 'PLAY', 0x22cc44);
-    play.on('pointerup', () => this.scene.start('GameScene'));
+    const play = makeBtn(this, W/2, H*0.70, 220, 54, 'PLAY (SOLO)', 0x22cc44);
+    play.on('pointerup', () => { this.registry.set('isMultiplayer',false); this.scene.start('GameScene'); });
+    const multi = makeBtn(this, W/2, H*0.84, 230, 46, '⚡ MULTIPLAYER', 0x2255cc);
+    multi.on('pointerup', () => this.scene.start('LobbyScene'));
 
     // Bottom nav
     const navY = H*0.91;
@@ -1302,6 +1304,219 @@ class GameScene extends Phaser.Scene {
 }
 
 // ─────────────────────────────────────────────────────────
+//  LOBBY SCENE
+// ─────────────────────────────────────────────────────────
+class LobbyScene extends Phaser.Scene {
+  constructor() { super('LobbyScene'); }
+
+  create() {
+    buildTextures(this);
+    drawBG(this);
+
+    const saved = this.registry.get('selectedChar');
+    const data  = loadData();
+    this.unlockedChars = CHARS.filter(c => data.unlocked.includes(c.id));
+    this.myCharIdx = Math.max(0, this.unlockedChars.findIndex(c => c.id === saved?.id));
+    this.myName  = 'Fighter' + Phaser.Math.Between(100, 999);
+    this.inRoom  = false;
+
+    if (!socket?.connected) {
+      connectToServer(ok => ok
+        ? this.setupSocket()
+        : this.showMsg('Cannot connect to server', '#ff4444'));
+    } else {
+      this.setupSocket();
+    }
+
+    this.buildUI();
+  }
+
+  ch() { return this.unlockedChars[this.myCharIdx]; }
+
+  setupSocket() {
+    socket.off('room_update').on('room_update', d => this.onRoom(d));
+    socket.off('join_error').on('join_error',   m => this.showMsg(m, '#ff4444'));
+    socket.off('game_start').on('game_start',   d => {
+      this.registry.set('mpPlayers',    d.players);
+      this.registry.set('isMultiplayer', true);
+      this.registry.set('selectedChar',  this.ch());
+      this.scene.start('GameScene');
+    });
+  }
+
+  buildUI() {
+    // ── header ──────────────────────────────────────────
+    const back = makeBtn(this, 55, 28, 90, 38, '< BACK', 0x334466);
+    back.on('pointerup', () => {
+      if (this.inRoom) socket?.emit('leave_room');
+      this.scene.start('HomeScene');
+    });
+    this.add.text(W/2, 28, 'MULTIPLAYER', {
+      fontSize:'24px', color:'#ffdd00', stroke:'#000000', strokeThickness:5, fontStyle:'bold'
+    }).setOrigin(0.5);
+
+    // ── left column: name + character ───────────────────
+    const lx = W * 0.25;
+
+    // Name
+    const nameY = H * 0.20;
+    this.add.text(lx, nameY, 'YOUR NAME', {fontSize:'11px',color:'#aaaacc'}).setOrigin(0.5);
+    this.nameTxt = this.add.text(lx, nameY+20, this.myName, {
+      fontSize:'17px', color:'#ffffff', stroke:'#000', strokeThickness:3, fontStyle:'bold'
+    }).setOrigin(0.5);
+    const chgBtn = makeBtn(this, lx, nameY+46, 120, 28, 'CHANGE NAME', 0x334466);
+    chgBtn.on('pointerup', () => {
+      const n = (window.prompt('Enter your name:', this.myName)||'').trim().slice(0,16);
+      if (n) { this.myName=n; this.nameTxt.setText(n); this.emitUpdate(); }
+    });
+
+    // Character selector
+    const charY = H * 0.50;
+    const prev = makeBtn(this, lx-70, charY, 44, 44, '◄', 0x334466);
+    const next = makeBtn(this, lx+70, charY, 44, 44, '►', 0x334466);
+    this.charImg = this.add.image(lx, charY, this.ch().id+'_md').setScale(1.1);
+    this.charLbl = this.add.text(lx, charY+48, this.ch().name, {
+      fontSize:'15px', color:'#fff', stroke:'#000', strokeThickness:3, fontStyle:'bold'
+    }).setOrigin(0.5);
+    this.charTag = this.add.text(lx, charY+66, this.ch().tag, {
+      fontSize:'10px', color:'#ffdd99'
+    }).setOrigin(0.5);
+
+    const updChar = () => {
+      this.charImg.setTexture(this.ch().id+'_md');
+      this.charLbl.setText(this.ch().name);
+      this.charTag.setText(this.ch().tag);
+      this.emitUpdate();
+    };
+    prev.on('pointerup', ()=>{ this.myCharIdx=(this.myCharIdx-1+this.unlockedChars.length)%this.unlockedChars.length; updChar(); });
+    next.on('pointerup', ()=>{ this.myCharIdx=(this.myCharIdx+1)%this.unlockedChars.length; updChar(); });
+
+    // ── bottom buttons ───────────────────────────────────
+    const btnY = H * 0.83;
+
+    // Pre-room
+    this.createBtn = makeBtn(this, lx-58, btnY, 100, 42, 'CREATE', 0x22cc44);
+    this.createBtn.on('pointerup', () => {
+      if (!socket?.connected) return this.showMsg('Not connected to server','#ff4444');
+      socket.emit('create_room', { name:this.myName, charId:this.ch().id });
+    });
+    this.joinBtn = makeBtn(this, lx+58, btnY, 100, 42, 'JOIN', 0x2255cc);
+    this.joinBtn.on('pointerup', () => {
+      if (!socket?.connected) return this.showMsg('Not connected to server','#ff4444');
+      const code = (window.prompt('Enter 4-letter room code:')||'').trim().toUpperCase();
+      if (code.length !== 4) return this.showMsg('Code must be 4 letters','#ff4444');
+      socket.emit('join_room', { code, name:this.myName, charId:this.ch().id });
+    });
+
+    // In-room
+    this.codeTxt = this.add.text(lx, btnY-26, '', {
+      fontSize:'20px', color:'#ffdd00', stroke:'#000', strokeThickness:4, fontStyle:'bold'
+    }).setOrigin(0.5).setVisible(false)
+      .setInteractive().on('pointerup', () => {
+        const code = this.codeTxt.text.replace('ROOM: ','');
+        navigator.clipboard?.writeText(code).catch(()=>{});
+        this.showMsg('Code copied!','#44ff88');
+      });
+
+    this.readyBtn = makeBtn(this, lx-58, btnY, 100, 42, 'READY', 0xcc5500);
+    this.readyBtn.setVisible(false);
+    this.readyBtn.on('pointerup', ()=> socket?.emit('player_ready'));
+
+    this.startBtn = makeBtn(this, lx+58, btnY, 100, 42, 'START', 0x22cc44);
+    this.startBtn.setVisible(false);
+    this.startBtn.on('pointerup', ()=> socket?.emit('start_game'));
+
+    this.leaveBtn = makeBtn(this, lx, btnY+34, 150, 28, 'LEAVE ROOM', 0x882222);
+    this.leaveBtn.setVisible(false);
+    this.leaveBtn.on('pointerup', ()=>{
+      socket?.emit('leave_room');
+      this.inRoom = false;
+      this.setRoomVis(false);
+      this.clearList();
+    });
+
+    // ── right column: player list ────────────────────────
+    const rx = W * 0.65;
+    this.divider = this.add.graphics().setVisible(false);
+    this.divider.lineStyle(1, 0x334466, 0.5);
+    this.divider.lineBetween(W*0.5, H*0.1, W*0.5, H*0.95);
+
+    this.listTitle = this.add.text(rx, H*0.18, '', {
+      fontSize:'14px', color:'#aaaacc', stroke:'#000', strokeThickness:2
+    }).setOrigin(0.5).setVisible(false);
+
+    this.listRows = [];
+    for (let i=0; i<10; i++) {
+      this.listRows.push(
+        this.add.text(rx, H*0.28+i*32, '', {
+          fontSize:'13px', color:'#fff', stroke:'#000', strokeThickness:2, fontFamily:'monospace'
+        }).setOrigin(0.5).setVisible(false)
+      );
+    }
+
+    // Status
+    this.msgTxt = this.add.text(W/2, H-14, '', {
+      fontSize:'13px', color:'#ff4444', stroke:'#000', strokeThickness:2
+    }).setOrigin(0.5);
+  }
+
+  setRoomVis(show) {
+    this.createBtn.setVisible(!show);
+    this.joinBtn.setVisible(!show);
+    this.codeTxt.setVisible(show);
+    this.readyBtn.setVisible(show);
+    this.startBtn.setVisible(show);
+    this.leaveBtn.setVisible(show);
+    this.listTitle.setVisible(show);
+    this.divider.setVisible(show);
+  }
+
+  clearList() { this.listRows.forEach(r => r.setVisible(false).setText('')); }
+
+  emitUpdate() {
+    if (this.inRoom && socket?.connected)
+      socket.emit('player_update', { name:this.myName, charId:this.ch().id });
+  }
+
+  showMsg(msg, color='#ff4444') {
+    this.msgTxt.setText(msg).setColor(color);
+    this.time.delayedCall(3000, ()=>{ if(this.msgTxt?.active) this.msgTxt.setText(''); });
+  }
+
+  onRoom(data) {
+    this.inRoom = true;
+    this.setRoomVis(true);
+    this.codeTxt.setText(`ROOM: ${data.code}  (tap to copy)`);
+
+    const myP    = data.players.find(p => p.id === socket.id);
+    const isHost = data.hostId === socket.id;
+    const allRdy = data.players.length >= 1 && data.players.every(p => p.ready);
+
+    this.readyBtn.list[2].setText(myP?.ready ? '✓ READY' : 'READY');
+    this.startBtn.setVisible(isHost).setAlpha(allRdy ? 1 : 0.4);
+
+    this.listTitle.setText(`Players (${data.players.length}/10)`).setVisible(true);
+    this.clearList();
+    data.players.forEach((p, i) => {
+      const star = p.id === data.hostId ? '★' : ' ';
+      const name = p.name.slice(0,12).padEnd(13);
+      const char = (p.charId||'').slice(0,8).padEnd(9);
+      const rdy  = p.ready ? '✓' : '✗';
+      this.listRows[i]
+        .setText(`${star} ${name}${char}${rdy}`)
+        .setColor(p.id === socket.id ? '#ffdd00' : '#ffffff')
+        .setVisible(true);
+    });
+  }
+
+  shutdown() {
+    socket?.off('room_update');
+    socket?.off('join_error');
+    socket?.off('game_start');
+  }
+}
+
+// ─────────────────────────────────────────────────────────
 //  LAUNCH
 // ─────────────────────────────────────────────────────────
 const isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
@@ -1325,7 +1540,7 @@ new Phaser.Game({
   width: W, height: H,
   backgroundColor: '#080818',
   physics: { default:'arcade', arcade:{gravity:{y:0},debug:false} },
-  scene: [HomeScene, CharSelectScene, ShopScene, SettingsScene, GameScene],
+  scene: [HomeScene, CharSelectScene, ShopScene, SettingsScene, GameScene, LobbyScene],
   scale: { mode:Phaser.Scale.FIT, autoCenter:Phaser.Scale.CENTER_BOTH }
 });
 </script>
