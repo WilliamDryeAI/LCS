@@ -658,7 +658,7 @@ class SettingsScene extends Phaser.Scene {
       {label:'Language',      val:'English', color:0x334433},
       {label:'Account',       val:'Guest',   color:0x443344},
     ];
-    const rw=Math.min(500,W-60), rh=50, sx=(W-rw)/2, sy=H*0.2;
+    const rw=Math.min(500,W-60), rh=50, sx=(W-rw)/2, sy=H*0.15;
     rows.forEach((row,i)=>{
       const y=sy+i*(rh+10);
       const g=this.add.graphics();
@@ -669,6 +669,32 @@ class SettingsScene extends Phaser.Scene {
       this.add.text(sx+rw-60,y+rh/2,row.val,{fontSize:'14px',color:'#ffdd99',fontStyle:'bold'}).setOrigin(0.5);
     });
 
+    // God Mode toggle
+    const godY = sy + rows.length*(rh+10) + 4;
+    let godOn = localStorage.getItem('br_godmode') === 'true';
+    const godBg  = this.add.graphics();
+    const godVal = this.add.text(sx+rw-60, godY+rh/2, godOn?'ON':'OFF', {
+      fontSize:'14px', color: godOn?'#44ff88':'#ffdd99', fontStyle:'bold'
+    }).setOrigin(0.5);
+    const drawGod = () => {
+      godBg.clear();
+      godBg.fillStyle(godOn?0x224422:0x442222, 0.9);
+      godBg.fillRoundedRect(sx, godY, rw, rh, 10);
+      godBg.lineStyle(2, godOn?0x44ff88:0x882222, 0.8);
+      godBg.strokeRoundedRect(sx, godY, rw, rh, 10);
+      godVal.setText(godOn?'ON':'OFF').setColor(godOn?'#44ff88':'#ff6666');
+    };
+    drawGod();
+    this.add.text(sx+18, godY+rh/2, '🧪 God Mode  (no damage taken)', {
+      fontSize:'15px', color:'#fff', stroke:'#000', strokeThickness:2
+    }).setOrigin(0,0.5);
+    godBg.setInteractive(new Phaser.Geom.Rectangle(sx,godY,rw,rh), Phaser.Geom.Rectangle.Contains);
+    godBg.on('pointerup', () => {
+      godOn = !godOn;
+      localStorage.setItem('br_godmode', godOn);
+      drawGod();
+    });
+
     // Reset save data button
     const resetBtn = makeBtn(this, W/2, H-50, 200, 42, 'RESET SAVE DATA', 0x882222);
     resetBtn.on('pointerup', () => {
@@ -677,7 +703,7 @@ class SettingsScene extends Phaser.Scene {
       this.scene.start('HomeScene');
     });
 
-    this.add.text(W/2,H-15,'v0.1  Built with Phaser 3',{fontSize:'11px',color:'#444466'}).setOrigin(0.5);
+    this.add.text(W/2,H-15,'Built with Phaser 3',{fontSize:'11px',color:'#444466'}).setOrigin(0.5);
   }
 }
 
@@ -959,6 +985,7 @@ class GameScene extends Phaser.Scene {
 
   hitPlayer(player, bullet) {
     if (this.gameOver || !bullet.active) return;
+    if (localStorage.getItem('br_godmode') === 'true') { bullet.destroy(); return; }
     if (bullet.grenade) {
       const x=bullet.x, y=bullet.y, dmg=bullet.damage, ownerId=bullet.ownerBotId??-1;
       bullet.destroy();
@@ -1358,32 +1385,33 @@ class LobbyScene extends Phaser.Scene {
       fontSize:'24px', color:'#ffdd00', stroke:'#000000', strokeThickness:5, fontStyle:'bold'
     }).setOrigin(0.5);
 
-    // ── left column: name + character ───────────────────
+    // ── left column: character + name above it ──────────
     const lx = W * 0.25;
-
-    // Name
-    const nameY = H * 0.20;
-    this.add.text(lx, nameY, 'YOUR NAME', {fontSize:'11px',color:'#aaaacc'}).setOrigin(0.5);
-    this.nameTxt = this.add.text(lx, nameY+20, this.myName, {
-      fontSize:'17px', color:'#ffffff', stroke:'#000', strokeThickness:3, fontStyle:'bold'
-    }).setOrigin(0.5);
-    const chgBtn = makeBtn(this, lx, nameY+46, 120, 28, 'CHANGE NAME', 0x334466);
-    chgBtn.on('pointerup', () => {
-      const n = (window.prompt('Enter your name:', this.myName)||'').trim().slice(0,16);
-      if (n) { this.myName=n; this.nameTxt.setText(n); this.emitUpdate(); }
-    });
-
-    // Character selector
     const charY = H * 0.50;
+
+    // Name displayed directly above the sprite
+    this.add.text(lx, charY-80, 'YOUR NAME', {fontSize:'10px',color:'#aaaacc'}).setOrigin(0.5);
+    this.nameTxt = this.add.text(lx, charY-62, this.myName, {
+      fontSize:'17px', color:'#ffdd00', stroke:'#000', strokeThickness:3, fontStyle:'bold'
+    }).setOrigin(0.5);
+
+    // Character selector — arrows either side, sprite center
     const prev = makeBtn(this, lx-70, charY, 44, 44, '◄', 0x334466);
     const next = makeBtn(this, lx+70, charY, 44, 44, '►', 0x334466);
     this.charImg = this.add.image(lx, charY, this.ch().id+'_md').setScale(1.1);
     this.charLbl = this.add.text(lx, charY+48, this.ch().name, {
       fontSize:'15px', color:'#fff', stroke:'#000', strokeThickness:3, fontStyle:'bold'
     }).setOrigin(0.5);
-    this.charTag = this.add.text(lx, charY+66, this.ch().tag, {
+    this.charTag = this.add.text(lx, charY+64, this.ch().tag, {
       fontSize:'10px', color:'#ffdd99'
     }).setOrigin(0.5);
+
+    // Change name below character info
+    const chgBtn = makeBtn(this, lx, charY+88, 130, 28, 'CHANGE NAME', 0x334466);
+    chgBtn.on('pointerup', () => {
+      const n = (window.prompt('Enter your name:', this.myName)||'').trim().slice(0,16);
+      if (n) { this.myName=n; this.nameTxt.setText(n); this.emitUpdate(); }
+    });
 
     const updChar = () => {
       this.charImg.setTexture(this.ch().id+'_md');
