@@ -17,9 +17,26 @@
   <div style="font-size:14px;color:#888;margin-top:6px">LCS plays in landscape mode</div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
 const W = window.innerWidth;
 const H = window.innerHeight;
+
+// ─────────────────────────────────────────────────────────
+//  SERVER CONNECTION
+// ─────────────────────────────────────────────────────────
+const SERVER_URL = 'https://lcs-server.onrender.com';
+let socket = null;
+let serverOnline = false;
+
+function connectToServer(onStatus) {
+  try {
+    socket = io(SERVER_URL, { transports:['websocket'], timeout:6000 });
+    socket.on('connect',       () => { serverOnline=true;  onStatus(true);  });
+    socket.on('connect_error', () => { serverOnline=false; onStatus(false); });
+    socket.on('disconnect',    () => { serverOnline=false; onStatus(false); });
+  } catch(e) { onStatus(false); }
+}
 
 // ─────────────────────────────────────────────────────────
 //  CHARACTER DATA
@@ -322,6 +339,16 @@ class HomeScene extends Phaser.Scene {
 
     // Coin badge top-right
     coinBadge(this, W - 75, 26, data.coins);
+
+    // Server status indicator (top-left)
+    const statusDot = this.add.text(12, 8, '● CONNECTING...', {
+      fontSize:'11px', color:'#888888', stroke:'#000', strokeThickness:2
+    }).setOrigin(0, 0);
+    connectToServer(online => {
+      if (!this.scene.isActive('HomeScene')) return;
+      statusDot.setText(online ? '● SERVER ONLINE' : '● SERVER OFFLINE');
+      statusDot.setColor(online ? '#44ff88' : '#ff4444');
+    });
 
     // Title
     const lcsFont    = Math.min(Math.floor(H * 0.14), 58);
