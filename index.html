@@ -82,6 +82,15 @@ const CHARS = [
     atk:{ angles:[-1.2,-0.72,-0.24,0.24,0.72,1.2], cooldown:1200, scale:0.9, speedMult:0.88, life:580 }
   },
   {
+    id:'lancer', name:'Lancer', tag:'Pierce Spear Fighter',
+    desc:'Throws a spear that pierces through up to 2 enemies without stopping. Line up your shots.',
+    color:0x884422, accent:0xddaa77, eye:0xffffff, bulletColor:0xffcc88,
+    rank:'Advanced', rankStars:2, rankColor:0x4499ff,
+    brawlerClass:'Fighter', classColor:0x662200,
+    hp:3000, spd:200, dmg:520, cost:420,
+    atk:{ angles:[0], cooldown:900, scale:1.8, speedMult:1.4, life:1600, pierce:2 }
+  },
+  {
     id:'storm', name:'Storm', tag:'Twin-Bolt Fighter',
     desc:'Two electric bolts per shot with a tight spread. Reliable damage at most ranges.',
     color:0xddcc00, accent:0xffffaa, eye:0x0033ff, bulletColor:0xffff44,
@@ -91,6 +100,15 @@ const CHARS = [
     atk:{ angles:[-0.1,0.1], cooldown:450, scale:1.0, speedMult:1.3, life:1200 }
   },
   {
+    id:'flame', name:'Flame', tag:'Short-Range Flamethrower',
+    desc:'Sprays a wide cone of fire at extreme close range. Very fast fire rate, devastating up close.',
+    color:0xff3300, accent:0xff9900, eye:0xffffff, bulletColor:0xff6600,
+    rank:'Elite', rankStars:3, rankColor:0xcc66ff,
+    brawlerClass:'Brawler', classColor:0xcc2200,
+    hp:4200, spd:225, dmg:100, cost:490,
+    atk:{ angles:[-0.22,0,0.22], cooldown:200, scale:2.4, speedMult:0.65, life:500 }
+  },
+  {
     id:'pulse', name:'Pulse', tag:'Rapid-Fire Machine Gun',
     desc:'Fires a stream of single shots at blistering speed. Requires sustained aim to maximise damage.',
     color:0x00cccc, accent:0x88ffff, eye:0x000000, bulletColor:0x44ffff,
@@ -98,6 +116,24 @@ const CHARS = [
     brawlerClass:'Gunner', classColor:0x009999,
     hp:2100, spd:230, dmg:260, cost:500,
     atk:{ angles:[0], cooldown:220, scale:0.6, speedMult:1.5, life:900 }
+  },
+  {
+    id:'hunter', name:'Hunter', tag:'Homing Missile Tracker',
+    desc:'Fires a missile that curves toward the nearest enemy. It will find its target.',
+    color:0x005577, accent:0x22aacc, eye:0xffffff, bulletColor:0x44ddff,
+    rank:'Elite', rankStars:3, rankColor:0xcc66ff,
+    brawlerClass:'Tracker', classColor:0x003355,
+    hp:2800, spd:210, dmg:650, cost:530,
+    atk:{ angles:[0], cooldown:1400, scale:0.9, speedMult:1.2, life:1800, homing:true }
+  },
+  {
+    id:'rex', name:'Rex', tag:'Grenade Launcher',
+    desc:'Lobs explosive grenades that burst into 8 shrapnel on impact. Devastating in tight corridors.',
+    color:0x774411, accent:0xcc8844, eye:0xffffff, bulletColor:0xff8800,
+    rank:'Elite', rankStars:3, rankColor:0xcc66ff,
+    brawlerClass:'Grenadier', classColor:0x552200,
+    hp:3500, spd:185, dmg:700, cost:550,
+    atk:{ angles:[0], cooldown:1600, scale:1.5, speedMult:0.8, life:1300, grenade:true }
   },
   {
     id:'phantom', name:'Phantom', tag:'Double-Tap Marksman',
@@ -116,42 +152,6 @@ const CHARS = [
     brawlerClass:'Assassin', classColor:0x661199,
     hp:2800, spd:265, dmg:1120, cost:700,
     atk:{ angles:[0], cooldown:300, scale:0.6, speedMult:1.7, life:800 }
-  },
-  {
-    id:'rex', name:'Rex', tag:'Grenade Launcher',
-    desc:'Lobs explosive grenades that burst into 8 shrapnel on impact. Devastating in tight corridors.',
-    color:0x774411, accent:0xcc8844, eye:0xffffff, bulletColor:0xff8800,
-    rank:'Elite', rankStars:3, rankColor:0xcc66ff,
-    brawlerClass:'Grenadier', classColor:0x552200,
-    hp:3500, spd:185, dmg:700, cost:550,
-    atk:{ angles:[0], cooldown:1600, scale:1.5, speedMult:0.8, life:1300, grenade:true }
-  },
-  {
-    id:'hunter', name:'Hunter', tag:'Homing Missile Tracker',
-    desc:'Fires a missile that curves toward the nearest enemy. It will find its target.',
-    color:0x005577, accent:0x22aacc, eye:0xffffff, bulletColor:0x44ddff,
-    rank:'Elite', rankStars:3, rankColor:0xcc66ff,
-    brawlerClass:'Tracker', classColor:0x003355,
-    hp:2800, spd:210, dmg:650, cost:530,
-    atk:{ angles:[0], cooldown:1400, scale:0.9, speedMult:1.2, life:1800, homing:true }
-  },
-  {
-    id:'lancer', name:'Lancer', tag:'Pierce Spear Fighter',
-    desc:'Throws a spear that pierces through up to 2 enemies without stopping. Line up your shots.',
-    color:0x884422, accent:0xddaa77, eye:0xffffff, bulletColor:0xffcc88,
-    rank:'Advanced', rankStars:2, rankColor:0x4499ff,
-    brawlerClass:'Fighter', classColor:0x662200,
-    hp:3000, spd:200, dmg:520, cost:420,
-    atk:{ angles:[0], cooldown:900, scale:1.8, speedMult:1.4, life:1600, pierce:2 }
-  },
-  {
-    id:'flame', name:'Flame', tag:'Short-Range Flamethrower',
-    desc:'Sprays a wide cone of fire at extreme close range. Very fast fire rate, devastating up close.',
-    color:0xff3300, accent:0xff9900, eye:0xffffff, bulletColor:0xff6600,
-    rank:'Elite', rankStars:3, rankColor:0xcc66ff,
-    brawlerClass:'Brawler', classColor:0xcc2200,
-    hp:4200, spd:225, dmg:100, cost:490,
-    atk:{ angles:[-0.22,0,0.22], cooldown:200, scale:2.4, speedMult:0.65, life:500 }
   },
 ];
 
