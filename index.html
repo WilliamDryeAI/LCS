@@ -34,7 +34,7 @@ const CHARS = [
     rank:'Basic', rankStars:1, rankColor:0xaaaaaa,
     brawlerClass:'Blaster', classColor:0xff6600,
     hp:5000, spd:220, dmg:350, cost:0,
-    atk:{ angles:[-0.28,0,0.28], cooldown:900, scale:1.0, speedMult:1.0, life:1800 }
+    atk:{ angles:[-0.28,0,0.28], cooldown:900, scale:1.0, speedMult:1.0, life:900 }
   },
   {
     id:'boulder', name:'Boulder', tag:'Slow Heavy Tank',
@@ -43,7 +43,7 @@ const CHARS = [
     rank:'Basic', rankStars:1, rankColor:0xaaaaaa,
     brawlerClass:'Tank', classColor:0x887755,
     hp:8000, spd:140, dmg:1050, cost:0,
-    atk:{ angles:[0], cooldown:1800, scale:2.8, speedMult:0.5, life:3000 }
+    atk:{ angles:[0], cooldown:1800, scale:2.8, speedMult:0.5, life:1800 }
   },
   {
     id:'frost', name:'Frost', tag:'Long-Range Sniper',
@@ -52,7 +52,7 @@ const CHARS = [
     rank:'Advanced', rankStars:2, rankColor:0x4499ff,
     brawlerClass:'Sniper', classColor:0x2266bb,
     hp:3800, spd:195, dmg:770, cost:150,
-    atk:{ angles:[0], cooldown:700, scale:0.7, speedMult:1.9, life:3500, rangeScale:true }
+    atk:{ angles:[0], cooldown:700, scale:0.7, speedMult:1.9, life:2000, rangeScale:true }
   },
   {
     id:'titan', name:'Titan', tag:'T-Shape Area Controller',
@@ -61,7 +61,7 @@ const CHARS = [
     rank:'Advanced', rankStars:2, rankColor:0x4499ff,
     brawlerClass:'Controller', classColor:0x3a6a1a,
     hp:3000, spd:155, dmg:340, cost:200,
-    atk:{ angles:[-1.57,0,1.57], cooldown:1300, scale:1.1, speedMult:0.75, life:2000 }
+    atk:{ angles:[-1.57,0,1.57], cooldown:1300, scale:1.1, speedMult:0.75, life:1100 }
   },
   {
     id:'venom', name:'Venom', tag:'Close-Range Sprayer',
@@ -70,7 +70,7 @@ const CHARS = [
     rank:'Advanced', rankStars:2, rankColor:0x4499ff,
     brawlerClass:'Sprayer', classColor:0x228833,
     hp:4500, spd:205, dmg:260, cost:250,
-    atk:{ angles:[-0.44,-0.22,0,0.22,0.44], cooldown:950, scale:0.85, speedMult:0.85, life:1300 }
+    atk:{ angles:[-0.44,-0.22,0,0.22,0.44], cooldown:950, scale:0.85, speedMult:0.85, life:680 }
   },
   {
     id:'nova', name:'Nova', tag:'Wide Burst Specialist',
@@ -79,7 +79,7 @@ const CHARS = [
     rank:'Advanced', rankStars:2, rankColor:0x4499ff,
     brawlerClass:'Blaster', classColor:0xbb7700,
     hp:2600, spd:210, dmg:210, cost:350,
-    atk:{ angles:[-1.2,-0.72,-0.24,0.24,0.72,1.2], cooldown:1200, scale:0.9, speedMult:0.88, life:1100 }
+    atk:{ angles:[-1.2,-0.72,-0.24,0.24,0.72,1.2], cooldown:1200, scale:0.9, speedMult:0.88, life:580 }
   },
   {
     id:'storm', name:'Storm', tag:'Twin-Bolt Fighter',
@@ -88,7 +88,7 @@ const CHARS = [
     rank:'Elite', rankStars:3, rankColor:0xcc66ff,
     brawlerClass:'Fighter', classColor:0xaa8800,
     hp:3200, spd:240, dmg:620, cost:450,
-    atk:{ angles:[-0.1,0.1], cooldown:450, scale:1.0, speedMult:1.3, life:2000 }
+    atk:{ angles:[-0.1,0.1], cooldown:450, scale:1.0, speedMult:1.3, life:1200 }
   },
   {
     id:'pulse', name:'Pulse', tag:'Rapid-Fire Machine Gun',
@@ -97,7 +97,7 @@ const CHARS = [
     rank:'Elite', rankStars:3, rankColor:0xcc66ff,
     brawlerClass:'Gunner', classColor:0x009999,
     hp:2100, spd:230, dmg:260, cost:500,
-    atk:{ angles:[0], cooldown:220, scale:0.6, speedMult:1.5, life:1700 }
+    atk:{ angles:[0], cooldown:220, scale:0.6, speedMult:1.5, life:900 }
   },
   {
     id:'phantom', name:'Phantom', tag:'Double-Tap Marksman',
@@ -106,7 +106,7 @@ const CHARS = [
     rank:'Elite', rankStars:3, rankColor:0xcc66ff,
     brawlerClass:'Marksman', classColor:0x440099,
     hp:1700, spd:215, dmg:850, cost:650,
-    atk:{ angles:[-0.06,0.06], cooldown:1600, scale:0.9, speedMult:1.7, life:2800 }
+    atk:{ angles:[-0.06,0.06], cooldown:1600, scale:0.9, speedMult:1.7, life:1700 }
   },
   {
     id:'shadow', name:'Shadow', tag:'Glass Cannon Assassin',
@@ -115,7 +115,43 @@ const CHARS = [
     rank:'Ultimate', rankStars:4, rankColor:0xffdd00,
     brawlerClass:'Assassin', classColor:0x661199,
     hp:2800, spd:265, dmg:1120, cost:700,
-    atk:{ angles:[0], cooldown:300, scale:0.6, speedMult:1.7, life:1500 }
+    atk:{ angles:[0], cooldown:300, scale:0.6, speedMult:1.7, life:800 }
+  },
+  {
+    id:'rex', name:'Rex', tag:'Grenade Launcher',
+    desc:'Lobs explosive grenades that burst into 8 shrapnel on impact. Devastating in tight corridors.',
+    color:0x774411, accent:0xcc8844, eye:0xffffff, bulletColor:0xff8800,
+    rank:'Elite', rankStars:3, rankColor:0xcc66ff,
+    brawlerClass:'Grenadier', classColor:0x552200,
+    hp:3500, spd:185, dmg:700, cost:550,
+    atk:{ angles:[0], cooldown:1600, scale:1.5, speedMult:0.8, life:1300, grenade:true }
+  },
+  {
+    id:'hunter', name:'Hunter', tag:'Homing Missile Tracker',
+    desc:'Fires a missile that curves toward the nearest enemy. It will find its target.',
+    color:0x005577, accent:0x22aacc, eye:0xffffff, bulletColor:0x44ddff,
+    rank:'Elite', rankStars:3, rankColor:0xcc66ff,
+    brawlerClass:'Tracker', classColor:0x003355,
+    hp:2800, spd:210, dmg:650, cost:530,
+    atk:{ angles:[0], cooldown:1400, scale:0.9, speedMult:1.2, life:1800, homing:true }
+  },
+  {
+    id:'lancer', name:'Lancer', tag:'Pierce Spear Fighter',
+    desc:'Throws a spear that pierces through up to 2 enemies without stopping. Line up your shots.',
+    color:0x884422, accent:0xddaa77, eye:0xffffff, bulletColor:0xffcc88,
+    rank:'Advanced', rankStars:2, rankColor:0x4499ff,
+    brawlerClass:'Fighter', classColor:0x662200,
+    hp:3000, spd:200, dmg:520, cost:420,
+    atk:{ angles:[0], cooldown:900, scale:1.8, speedMult:1.4, life:1600, pierce:2 }
+  },
+  {
+    id:'flame', name:'Flame', tag:'Short-Range Flamethrower',
+    desc:'Sprays a wide cone of fire at extreme close range. Very fast fire rate, devastating up close.',
+    color:0xff3300, accent:0xff9900, eye:0xffffff, bulletColor:0xff6600,
+    rank:'Elite', rankStars:3, rankColor:0xcc66ff,
+    brawlerClass:'Brawler', classColor:0xcc2200,
+    hp:4200, spd:225, dmg:100, cost:490,
+    atk:{ angles:[-0.22,0,0.22], cooldown:200, scale:2.4, speedMult:0.65, life:500 }
   },
 ];
 
@@ -143,6 +179,22 @@ function buildTextures(scene) {
     const g = scene.make.graphics({ x:0, y:0, add:false });
     fn(g); g.generateTexture(key, w, h); g.destroy();
   };
+
+  // Pre-create special bullet textures before the loop so the loop skips these keys
+  t('rex_b', 18, 18, g => {
+    g.fillStyle(0x553311); g.fillCircle(9,9,9);
+    g.fillStyle(0xff8800,0.75); g.fillCircle(9,9,5);
+    g.fillStyle(0xffdd00,0.45); g.fillCircle(7,7,3);
+  });
+  t('lancer_b', 36, 10, g => {
+    g.fillStyle(0xddaa66); g.fillRect(0,1,32,8);
+    g.fillStyle(0xffee99); g.fillRect(2,3,28,4);
+    g.fillStyle(0xffffff,0.5); g.fillRect(4,3,12,2);
+  });
+  t('shrapnel', 8, 8, g => {
+    g.fillStyle(0xff6600); g.fillCircle(4,4,4);
+    g.fillStyle(0xffaa44,0.6); g.fillCircle(3,3,2);
+  });
 
   CHARS.forEach(c => {
     // small sprite 48x48
@@ -718,8 +770,8 @@ class GameScene extends Phaser.Scene {
   makeCollisions() {
     this.physics.add.collider(this.player,  this.walls);
     this.physics.add.collider(this.enemies, this.walls);
-    this.physics.add.collider(this.pBullets,this.walls,b=>b.destroy());
-    this.physics.add.collider(this.eBullets,this.walls,b=>b.destroy());
+    this.physics.add.collider(this.pBullets,this.walls,(b)=>this.bulletHitsWall(b,false));
+    this.physics.add.collider(this.eBullets,this.walls,(b)=>this.bulletHitsWall(b,true));
     this.physics.add.overlap(this.pBullets,this.enemies,this.hitEnemy,   null,this);
     this.physics.add.overlap(this.eBullets,this.player, this.hitPlayer,  null,this);
     this.physics.add.overlap(this.eBullets,this.enemies,this.hitBotByBot,null,this);
@@ -743,6 +795,49 @@ class GameScene extends Phaser.Scene {
     return false;
   }
 
+  traceRay(x, y, ang, maxDist) {
+    const step = 16;
+    let d = 30;
+    while (d < maxDist) {
+      if (this.pointInWall(x + Math.cos(ang)*d, y + Math.sin(ang)*d)) return d;
+      d += step;
+    }
+    return maxDist;
+  }
+
+  bulletHitsWall(b, isEnemy) {
+    if (!b.active) return;
+    if (b.grenade) {
+      const x=b.x, y=b.y, dmg=b.damage, ownerId=b.ownerBotId??-1;
+      b.destroy();
+      this.spawnExplosion(x, y, dmg, isEnemy, ownerId);
+    } else {
+      b.destroy();
+    }
+  }
+
+  spawnExplosion(x, y, dmg, isEnemy, ownerId) {
+    const shrapDmg = Math.round(dmg * 0.35);
+    const life = 380;
+    const group = isEnemy ? this.eBullets : this.pBullets;
+    for (let i = 0; i < 8; i++) {
+      const ang = (i / 8) * Math.PI * 2;
+      const bx = x + Math.cos(ang)*14, by = y + Math.sin(ang)*14;
+      if (this.pointInWall(bx, by)) continue;
+      const s = group.create(bx, by, 'shrapnel');
+      s.setDepth(8).setScale(0.9);
+      s.setVelocity(Math.cos(ang)*700, Math.sin(ang)*700);
+      s.damage = shrapDmg;
+      s.birthTime = this.time.now; s.maxLife = life;
+      if (isEnemy) s.ownerBotId = ownerId;
+      this.time.delayedCall(life, ()=>{ if(s?.active) s.destroy(); });
+    }
+    const flash = this.add.graphics().setDepth(20);
+    flash.fillStyle(0xff8800,0.85).fillCircle(x,y,44);
+    flash.fillStyle(0xffdd00,0.5).fillCircle(x,y,22);
+    this.time.delayedCall(140, ()=>flash.destroy());
+  }
+
   shootPlayer(x, y, dx, dy) {
     const { atk, dmg, id } = this.ch;
     const baseAng = Math.atan2(dy, dx);
@@ -759,6 +854,9 @@ class GameScene extends Phaser.Scene {
       b.damage = dmg;
       b.birthTime = this.time.now; b.maxLife = atk.life;
       if (atk.rangeScale) b.rangeScale = true;
+      if (atk.grenade) b.grenade = true;
+      if (atk.homing)  b.homing  = true;
+      if (atk.pierce !== undefined) { b.pierce = atk.pierce; b.hitTargets = new Set(); b.setRotation(ang); }
       this.time.delayedCall(atk.life, ()=>{ if(b?.active) b.destroy(); });
     });
   }
@@ -780,6 +878,9 @@ class GameScene extends Phaser.Scene {
       b.ownerBotId = owner?.botId ?? -1;
       b.birthTime = this.time.now; b.maxLife = atk.life;
       if (atk.rangeScale) b.rangeScale = true;
+      if (atk.grenade) b.grenade = true;
+      if (atk.homing)  b.homing  = true;
+      if (atk.pierce !== undefined) { b.pierce = atk.pierce; b.hitTargets = new Set(); b.setRotation(ang); }
       this.time.delayedCall(atk.life, ()=>{ if(b?.active) b.destroy(); });
     });
   }
@@ -793,10 +894,27 @@ class GameScene extends Phaser.Scene {
   }
 
   hitEnemy(bullet, enemy) {
+    if (!bullet.active || !enemy.active) return;
+    if (bullet.grenade) {
+      const x=bullet.x, y=bullet.y, dmg=bullet.damage;
+      bullet.destroy();
+      this.spawnExplosion(x, y, dmg, false, -1);
+      return;
+    }
     const dmg = this.rangedDmg(bullet);
-    bullet.destroy();
-    enemy.health -= dmg;
-    this.tweens.add({targets:enemy,alpha:0.1,duration:60,yoyo:true});
+    if (bullet.pierce !== undefined) {
+      if (!bullet.hitTargets) bullet.hitTargets = new Set();
+      if (bullet.hitTargets.has(enemy.botId)) return;
+      bullet.hitTargets.add(enemy.botId);
+      enemy.health -= dmg;
+      this.tweens.add({targets:enemy,alpha:0.1,duration:60,yoyo:true});
+      if (bullet.pierce <= 0) bullet.destroy(); else bullet.pierce--;
+    } else {
+      bullet.destroy();
+      enemy.health -= dmg;
+      this.tweens.add({targets:enemy,alpha:0.1,duration:60,yoyo:true});
+    }
+    if (!enemy.active) return;
     if (enemy.health <= 0) {
       if (enemy.label) enemy.label.destroy();
       enemy.destroy();
@@ -808,7 +926,13 @@ class GameScene extends Phaser.Scene {
   }
 
   hitPlayer(player, bullet) {
-    if (this.gameOver) return;
+    if (this.gameOver || !bullet.active) return;
+    if (bullet.grenade) {
+      const x=bullet.x, y=bullet.y, dmg=bullet.damage, ownerId=bullet.ownerBotId??-1;
+      bullet.destroy();
+      this.spawnExplosion(x, y, dmg, true, ownerId);
+      return;
+    }
     const dmg = this.rangedDmg(bullet);
     bullet.destroy();
     this.player.health = Math.max(0, this.player.health - dmg);
@@ -817,11 +941,28 @@ class GameScene extends Phaser.Scene {
   }
 
   hitBotByBot(bullet, enemy) {
+    if (!bullet.active || !enemy.active) return;
     if (bullet.ownerBotId === enemy.botId) return;
+    if (bullet.grenade) {
+      const x=bullet.x, y=bullet.y, dmg=bullet.damage, ownerId=bullet.ownerBotId??-1;
+      bullet.destroy();
+      this.spawnExplosion(x, y, dmg, true, ownerId);
+      return;
+    }
     const dmg = this.rangedDmg(bullet);
-    bullet.destroy();
-    enemy.health -= dmg;
-    this.tweens.add({targets:enemy,alpha:0.1,duration:60,yoyo:true});
+    if (bullet.pierce !== undefined) {
+      if (!bullet.hitTargets) bullet.hitTargets = new Set();
+      if (bullet.hitTargets.has(enemy.botId)) return;
+      bullet.hitTargets.add(enemy.botId);
+      enemy.health -= dmg;
+      this.tweens.add({targets:enemy,alpha:0.1,duration:60,yoyo:true});
+      if (bullet.pierce <= 0) bullet.destroy(); else bullet.pierce--;
+    } else {
+      bullet.destroy();
+      enemy.health -= dmg;
+      this.tweens.add({targets:enemy,alpha:0.1,duration:60,yoyo:true});
+    }
+    if (!enemy.active) return;
     if (enemy.health <= 0) {
       if (enemy.label) enemy.label.destroy();
       enemy.destroy();
@@ -938,11 +1079,12 @@ class GameScene extends Phaser.Scene {
     const isAiming = this.fireBtn.on || this.keys.fire.isDown;
     if (!isAiming || !this.player?.active) return;
     const { atk, bulletColor } = this.ch;
-    const range = 640 * atk.speedMult * atk.life / 1000;
+    const maxRange = 640 * atk.speedMult * atk.life / 1000;
     const baseAng = Math.atan2(this.lastFacing.y, this.lastFacing.x);
     const dash = 12, seg = 21;
     atk.angles.forEach(offset => {
       const ang = baseAng + offset;
+      const range = this.traceRay(this.player.x, this.player.y, ang, maxRange);
       let d = 30;
       while (d < range) {
         const dEnd = Math.min(d + dash, range);
@@ -1037,6 +1179,32 @@ class GameScene extends Phaser.Scene {
       if (!b.active || b.maxLife === undefined) return;
       const remaining = b.maxLife - (time - b.birthTime);
       b.setAlpha(remaining < fadeWin ? Math.max(0.05, remaining / fadeWin) : 1);
+    });
+
+    // Homing bullet steering
+    this.pBullets.getChildren().forEach(b => {
+      if (!b.active || !b.homing) return;
+      let nearE = null, nearD = Infinity;
+      this.enemies.getChildren().forEach(e => {
+        const d = Phaser.Math.Distance.Between(b.x, b.y, e.x, e.y);
+        if (d < nearD) { nearD = d; nearE = e; }
+      });
+      if (!nearE) return;
+      const tAng = Math.atan2(nearE.y - b.y, nearE.x - b.x);
+      const cAng = Math.atan2(b.body.velocity.y, b.body.velocity.x);
+      const spd  = Math.hypot(b.body.velocity.x, b.body.velocity.y);
+      const diff = Phaser.Math.Angle.Wrap(tAng - cAng);
+      const nAng = cAng + Phaser.Math.Clamp(diff, -0.07, 0.07);
+      b.setVelocity(Math.cos(nAng)*spd, Math.sin(nAng)*spd);
+    });
+    this.eBullets.getChildren().forEach(b => {
+      if (!b.active || !b.homing || !this.player?.active) return;
+      const tAng = Math.atan2(this.player.y - b.y, this.player.x - b.x);
+      const cAng = Math.atan2(b.body.velocity.y, b.body.velocity.x);
+      const spd  = Math.hypot(b.body.velocity.x, b.body.velocity.y);
+      const diff = Phaser.Math.Angle.Wrap(tAng - cAng);
+      const nAng = cAng + Phaser.Math.Clamp(diff, -0.07, 0.07);
+      b.setVelocity(Math.cos(nAng)*spd, Math.sin(nAng)*spd);
     });
 
     // Enemy AI
