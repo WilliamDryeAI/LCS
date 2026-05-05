@@ -377,10 +377,12 @@ class HomeScene extends Phaser.Scene {
       fontSize:'12px', color:'#ffdd99', stroke:'#000000', strokeThickness:2
     }).setOrigin(0.5);
 
-    // PLAY — centered, lower
-    const play = makeBtn(this, W/2, H*0.70, 220, 54, 'PLAY (SOLO)', 0x22cc44);
+    // PLAY + MULTIPLAYER — side by side
+    const bw = Math.min(200, W*0.27);
+    const gap = bw/2 + 10;
+    const play = makeBtn(this, W/2-gap, H*0.74, bw, 54, 'PLAY', 0x22cc44);
     play.on('pointerup', () => { this.registry.set('isMultiplayer',false); this.scene.start('GameScene'); });
-    const multi = makeBtn(this, W/2, H*0.84, 230, 46, '⚡ MULTIPLAYER', 0x2255cc);
+    const multi = makeBtn(this, W/2+gap, H*0.74, bw, 54, '⚡ MULTI', 0x2255cc);
     multi.on('pointerup', () => this.scene.start('LobbyScene'));
 
     // Bottom nav
