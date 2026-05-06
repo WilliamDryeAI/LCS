@@ -720,14 +720,27 @@ class GameScene extends Phaser.Scene {
 
     this.ch = this.registry.get('selectedChar') || CHARS[0];
     this.killCount = 0;
+    this.isMP = this.registry.get('isMultiplayer') === true;
+    this.remotePlayers = {};
+    this.posTimer = 0;
 
     this.makeMap();
     this.makePlayer();
-    this.makeEnemies(6);
+
+    // In multiplayer, reduce bots by the number of other human players
+    const mpPlayers = this.isMP ? (this.registry.get('mpPlayers') || []) : [];
+    const botCount  = this.isMP ? Math.max(0, 6 - (mpPlayers.length - 1)) : 6;
+    this.makeEnemies(botCount);
+
     this.pBullets = this.physics.add.group();
     this.eBullets = this.physics.add.group();
     this.lastShot = 0;
     this.makeCollisions();
+
+    if (this.isMP) {
+      mpPlayers.forEach(p => { if (p.id !== socket?.id) this.spawnRemotePlayer(p); });
+      this.setupMultiplayerListeners();
+    }
 
     this.cameras.main.setBounds(0,0,this.WORLD.w,this.WORLD.h);
     this.cameras.main.startFollow(this.player,true,0.09,0.09);
@@ -821,6 +834,41 @@ class GameScene extends Phaser.Scene {
         fontSize:'11px', color:'#ffcccc', stroke:'#000000', strokeThickness:2
       }).setOrigin(0.5,1).setDepth(10);
     }
+  }
+
+  // ─── MULTIPLAYER ─────────────────────────────────────
+
+  spawnRemotePlayer(p) {
+    const char = CHARS.find(c => c.id === p.charId) || CHARS[0];
+    const sx = this.WORLD.w/2 + Phaser.Math.Between(-300,300);
+    const sy = this.WORLD.h/2 + Phaser.Math.Between(-300,300);
+    const sprite = this.add.sprite(sx, sy, char.id+'_sm').setDepth(10);
+    const nameTag = this.add.text(sx, sy-50, p.name, {
+      fontSize:'12px', color:'#88ffff', stroke:'#000', strokeThickness:2
+    }).setOrigin(0.5,1).setDepth(11);
+    this.remotePlayers[p.id] = {
+      sprite, nameTag, hp: char.hp, maxHp: char.hp,
+      targetX:sx, targetY:sy, targetRot:0
+    };
+  }
+
+  setupMultiplayerListeners() {
+    socket.off('player_moved').on('player_moved', ({ id, x, y, rotation, hp }) => {
+      const rp = this.remotePlayers[id];
+      if (!rp) return;
+      rp.targetX = x; rp.targetY = y; rp.targetRot = rotation; rp.hp = hp;
+    });
+    // Remove sprite when player leaves room mid-game
+    socket.off('room_update').on('room_update', data => {
+      const live = new Set(data.players.map(p => p.id));
+      Object.keys(this.remotePlayers).forEach(id => {
+        if (!live.has(id)) {
+          this.remotePlayers[id].sprite?.destroy();
+          this.remotePlayers[id].nameTag?.destroy();
+          delete this.remotePlayers[id];
+        }
+      });
+    });
   }
 
   // ─── COLLISIONS ──────────────────────────────────────
@@ -1037,6 +1085,7 @@ class GameScene extends Phaser.Scene {
     if (this.gameOver) return;
     this.gameOver = true;
     this.physics.pause();
+    if (this.isMP && socket?.connected) socket.emit('leave_room');
 
     // Save coins earned
     const earned = this.killCount * 15 + (won ? 80 : 0);
@@ -1169,6 +1218,9 @@ class GameScene extends Phaser.Scene {
     };
     bar(this.player.x, this.player.y, this.player.health, this.player.maxHealth);
     this.enemies.getChildren().forEach(e => bar(e.x, e.y, e.health, e.maxHealth));
+    Object.values(this.remotePlayers).forEach(rp => {
+      if (rp.sprite?.active) bar(rp.sprite.x, rp.sprite.y, rp.hp, rp.maxHp);
+    });
   }
 
   drawControls() {
@@ -1326,10 +1378,39 @@ class GameScene extends Phaser.Scene {
     });
 
     this.nameTag.setPosition(this.player.x, this.player.y-50);
+
+    // Broadcast position to server (multiplayer)
+    if (this.isMP && socket?.connected) {
+      if (++this.posTimer >= 3) {
+        this.posTimer = 0;
+        socket.emit('move', {
+          x: Math.round(this.player.x),
+          y: Math.round(this.player.y),
+          rotation: this.player.rotation,
+          hp: this.player.health
+        });
+      }
+    }
+
+    // Smooth-lerp remote players toward their latest received position
+    Object.values(this.remotePlayers).forEach(rp => {
+      if (!rp.sprite?.active) return;
+      rp.sprite.x        = Phaser.Math.Linear(rp.sprite.x,        rp.targetX,   0.25);
+      rp.sprite.y        = Phaser.Math.Linear(rp.sprite.y,        rp.targetY,   0.25);
+      rp.sprite.rotation = Phaser.Math.Angle.RotateTo(rp.sprite.rotation, rp.targetRot, 0.2);
+      rp.nameTag.setPosition(rp.sprite.x, rp.sprite.y - 50);
+    });
+
     this.drawHP();
     this.drawWorldHP();
     this.drawAimIndicator();
     this.drawControls();
+  }
+
+  shutdown() {
+    if (!socket) return;
+    socket.off('player_moved');
+    socket.off('room_update');
   }
 }
 
