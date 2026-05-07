@@ -395,7 +395,7 @@ class HomeScene extends Phaser.Scene {
     const sett = makeBtn(this, W/2+navGap, navY, 110, 42, 'SETTINGS', 0x445566);
     sett.on('pointerup', () => this.scene.start('SettingsScene'));
 
-    this.add.text(W/2, H-8, '© 2026 William Drye', {fontSize:'11px',color:'#444466'}).setOrigin(0.5,1);
+    this.add.text(8, H-8, '© 2026 William Drye', {fontSize:'11px',color:'#444466'}).setOrigin(0,1);
     this.add.text(W-8,H-8,'v.9303e5c',{fontSize:'11px',color:'#555577'}).setOrigin(1,1);
   }
 }
