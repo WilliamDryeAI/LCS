@@ -1468,12 +1468,13 @@ class LobbyScene extends Phaser.Scene {
 
     // ── left column layout ──────────────────────────────
     const lx = W * 0.25;
-    // Zones (top→bottom): code | name | char card | action btns | leave
-    const codeY  = H * 0.13;
-    const nameY  = H * 0.26;
-    const charY  = H * 0.50;
-    const btnY   = H * 0.75;
-    const leaveY = H * 0.87;
+    // Header sits at y=28 (BACK + MULTIPLAYER title), bottom edge ~y=47.
+    // Fixed pixel anchor keeps room code clear of header on all screen sizes.
+    const codeY  = 70;
+    const nameY  = H * 0.28;
+    const charY  = H * 0.52;
+    const btnY   = H * 0.76;
+    const leaveY = H * 0.88;
 
     // Room code — shown only when in a room
     this.codeTxt = this.add.text(lx, codeY, '', {
