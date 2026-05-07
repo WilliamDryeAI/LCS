@@ -1466,15 +1466,34 @@ class LobbyScene extends Phaser.Scene {
       fontSize:'24px', color:'#ffdd00', stroke:'#000000', strokeThickness:5, fontStyle:'bold'
     }).setOrigin(0.5);
 
-    // ── left column: character + name above it ──────────
+    // ── left column layout ──────────────────────────────
     const lx = W * 0.25;
-    const charY = H * 0.50;
+    // Zones (top→bottom): code | name | char card | action btns | leave
+    const codeY  = H * 0.13;
+    const nameY  = H * 0.26;
+    const charY  = H * 0.50;
+    const btnY   = H * 0.75;
+    const leaveY = H * 0.87;
 
-    // Name displayed directly above the sprite
-    this.add.text(lx, charY-80, 'YOUR NAME', {fontSize:'10px',color:'#aaaacc'}).setOrigin(0.5);
-    this.nameTxt = this.add.text(lx, charY-62, this.myName, {
+    // Room code — shown only when in a room
+    this.codeTxt = this.add.text(lx, codeY, '', {
+      fontSize:'20px', color:'#ffdd00', stroke:'#000', strokeThickness:4, fontStyle:'bold'
+    }).setOrigin(0.5).setVisible(false)
+      .setInteractive().on('pointerup', () => {
+        navigator.clipboard?.writeText(this.roomCode||'').catch(()=>{});
+        this.showMsg('Code copied!','#44ff88');
+      });
+
+    // Name zone
+    this.add.text(lx, nameY - 16, 'YOUR NAME', {fontSize:'10px',color:'#aaaacc'}).setOrigin(0.5);
+    this.nameTxt = this.add.text(lx, nameY + 8, this.myName, {
       fontSize:'17px', color:'#ffdd00', stroke:'#000', strokeThickness:3, fontStyle:'bold'
     }).setOrigin(0.5);
+    const chgBtn = makeBtn(this, lx, nameY + 36, 130, 28, 'CHANGE NAME', 0x334466);
+    chgBtn.on('pointerup', () => {
+      const n = (window.prompt('Enter your name:', this.myName)||'').trim().slice(0,16);
+      if (n) { this.myName=n; this.nameTxt.setText(n); this.emitUpdate(); }
+    });
 
     // Character selector — arrows either side, sprite center
     const prev = makeBtn(this, lx-70, charY, 44, 44, '◄', 0x334466);
@@ -1487,13 +1506,6 @@ class LobbyScene extends Phaser.Scene {
       fontSize:'10px', color:'#ffdd99'
     }).setOrigin(0.5);
 
-    // Change name below character info
-    const chgBtn = makeBtn(this, lx, charY+88, 130, 28, 'CHANGE NAME', 0x334466);
-    chgBtn.on('pointerup', () => {
-      const n = (window.prompt('Enter your name:', this.myName)||'').trim().slice(0,16);
-      if (n) { this.myName=n; this.nameTxt.setText(n); this.emitUpdate(); }
-    });
-
     const updChar = () => {
       this.charImg.setTexture(this.ch().id+'_md');
       this.charLbl.setText(this.ch().name);
@@ -1503,8 +1515,7 @@ class LobbyScene extends Phaser.Scene {
     prev.on('pointerup', ()=>{ this.myCharIdx=(this.myCharIdx-1+this.unlockedChars.length)%this.unlockedChars.length; updChar(); });
     next.on('pointerup', ()=>{ this.myCharIdx=(this.myCharIdx+1)%this.unlockedChars.length; updChar(); });
 
-    // ── bottom buttons ───────────────────────────────────
-    const btnY = H * 0.83;
+    // ── action buttons ───────────────────────────────────
 
     // Pre-room
     this.createBtn = makeBtn(this, lx-58, btnY, 100, 42, 'CREATE', 0x22cc44);
@@ -1521,15 +1532,6 @@ class LobbyScene extends Phaser.Scene {
     });
 
     // In-room
-    this.codeTxt = this.add.text(lx, btnY-26, '', {
-      fontSize:'20px', color:'#ffdd00', stroke:'#000', strokeThickness:4, fontStyle:'bold'
-    }).setOrigin(0.5).setVisible(false)
-      .setInteractive().on('pointerup', () => {
-        const code = this.codeTxt.text.replace('ROOM: ','');
-        navigator.clipboard?.writeText(code).catch(()=>{});
-        this.showMsg('Code copied!','#44ff88');
-      });
-
     this.readyBtn = makeBtn(this, lx-58, btnY, 100, 42, 'READY', 0xcc5500);
     this.readyBtn.setVisible(false);
     this.readyBtn.on('pointerup', ()=> socket?.emit('player_ready'));
@@ -1538,7 +1540,7 @@ class LobbyScene extends Phaser.Scene {
     this.startBtn.setVisible(false);
     this.startBtn.on('pointerup', ()=> socket?.emit('start_game'));
 
-    this.leaveBtn = makeBtn(this, lx, btnY+34, 150, 28, 'LEAVE ROOM', 0x882222);
+    this.leaveBtn = makeBtn(this, lx, leaveY, 150, 32, 'LEAVE ROOM', 0x882222);
     this.leaveBtn.setVisible(false);
     this.leaveBtn.on('pointerup', ()=>{
       socket?.emit('leave_room');
@@ -1598,6 +1600,7 @@ class LobbyScene extends Phaser.Scene {
   onRoom(data) {
     this.inRoom = true;
     this.setRoomVis(true);
+    this.roomCode = data.code;
     this.codeTxt.setText(`ROOM: ${data.code}  (tap to copy)`);
 
     const myP    = data.players.find(p => p.id === socket.id);
