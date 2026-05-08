@@ -1427,8 +1427,10 @@ class GameScene extends Phaser.Scene {
       this.shootPlayer(this.player.x, this.player.y, this.lastFacing.x, this.lastFacing.y);
       this.lastShot = time;
     }
-    if (k.fire.isDown && (vx||vy) && time - this.lastShot > cd) {
-      this.shootPlayer(this.player.x, this.player.y, vx, vy);
+    if (k.fire.isDown && time - this.lastShot > cd) {
+      const fdx = (vx||vy) ? vx : this.lastFacing.x;
+      const fdy = (vx||vy) ? vy : this.lastFacing.y;
+      this.shootPlayer(this.player.x, this.player.y, fdx, fdy);
       this.lastShot = time;
     }
 
