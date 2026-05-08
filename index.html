@@ -968,6 +968,33 @@ class GameScene extends Phaser.Scene {
       if (!rp) return;
       rp.targetX = x; rp.targetY = y; rp.targetRot = rotation; rp.hp = hp;
     });
+
+    // Another player was hit by us — their HP syncs via 'move', nothing extra needed
+    socket.off('you_were_hit').on('you_were_hit', ({ damage }) => {
+      if (this.gameOver) return;
+      if (localStorage.getItem('br_godmode') === 'true') return;
+      this.player.health = Math.max(0, this.player.health - damage);
+      if (this.player.health === 0) {
+        socket.emit('player_eliminated');
+        this.endGame(false);
+      }
+    });
+
+    // A player was eliminated — remove their sprite
+    socket.off('player_died').on('player_died', ({ id }) => {
+      const rp = this.remotePlayers[id];
+      if (rp) {
+        rp.sprite?.destroy();
+        rp.nameTag?.destroy();
+        delete this.remotePlayers[id];
+      }
+    });
+
+    // Server says we're the last one standing
+    socket.off('game_won').on('game_won', () => {
+      if (!this.gameOver) this.endGame(true);
+    });
+
     // Remove sprite when player leaves room mid-game
     socket.off('room_update').on('room_update', data => {
       const live = new Set(data.players.map(p => p.id));
@@ -1255,7 +1282,7 @@ class GameScene extends Phaser.Scene {
       this.killCount++;
       const left = this.enemies.getChildren().length;
       this.cntLabel.setText('Enemies: '+left);
-      if (left === 0) this.endGame(true);
+      if (left === 0 && !this.isMP) this.endGame(true);
     }
   }
 
@@ -1300,7 +1327,7 @@ class GameScene extends Phaser.Scene {
       enemy.destroy();
       const left = this.enemies.getChildren().length;
       this.cntLabel.setText('Enemies: '+left);
-      if (left === 0) this.endGame(true);
+      if (left === 0 && !this.isMP) this.endGame(true);
     }
   }
 
@@ -1310,7 +1337,10 @@ class GameScene extends Phaser.Scene {
     if (this.gameOver) return;
     this.gameOver = true;
     this.physics.pause();
-    if (this.isMP && socket?.connected) socket.emit('leave_room');
+    if (this.isMP && socket?.connected) {
+      if (!won) socket.emit('player_eliminated');
+      socket.emit('leave_room');
+    }
 
     // Save coins earned
     const earned = this.killCount * 15 + (won ? 80 : 0);
@@ -1591,7 +1621,7 @@ class GameScene extends Phaser.Scene {
               this.killCount++;
               const left = this.enemies.getChildren().length;
               this.cntLabel.setText('Enemies: '+left);
-              if (left === 0) this.endGame(true);
+              if (left === 0 && !this.isMP) this.endGame(true);
             }
           }
         });
@@ -1621,7 +1651,7 @@ class GameScene extends Phaser.Scene {
               this.killCount++;
               const left = this.enemies.getChildren().length;
               this.cntLabel.setText('Enemies: '+left);
-              if (left === 0) this.endGame(true);
+              if (left === 0 && !this.isMP) this.endGame(true);
             }
           }
         });
@@ -1709,7 +1739,7 @@ class GameScene extends Phaser.Scene {
 
     this.nameTag.setPosition(this.player.x, this.player.y-50);
 
-    // Broadcast position to server (multiplayer)
+    // Multiplayer: broadcast position + check bullet hits on remote players
     if (this.isMP && socket?.connected) {
       if (++this.posTimer >= 3) {
         this.posTimer = 0;
@@ -1720,6 +1750,26 @@ class GameScene extends Phaser.Scene {
           hp: this.player.health
         });
       }
+      // Local bullets hitting remote player sprites
+      this.pBullets.getChildren().forEach(b => {
+        if (!b.active) return;
+        Object.entries(this.remotePlayers).forEach(([id, rp]) => {
+          if (!rp.sprite?.active) return;
+          if (Phaser.Math.Distance.Between(b.x, b.y, rp.sprite.x, rp.sprite.y) < 28) {
+            const dmg = this.rangedDmg(b);
+            if (b.fireZone) this.spawnFireZone(b.x, b.y, b.damage, false, -1);
+            if (b.pierce !== undefined && b.pierce > 0) {
+              if (!b.rpHitTargets) b.rpHitTargets = new Set();
+              if (b.rpHitTargets.has(id)) return;
+              b.rpHitTargets.add(id);
+              b.pierce--;
+            } else {
+              b.destroy();
+            }
+            socket.emit('hit_player', { targetId: id, damage: dmg });
+          }
+        });
+      });
     }
 
     // Smooth-lerp remote players toward their latest received position
@@ -1741,6 +1791,9 @@ class GameScene extends Phaser.Scene {
     if (!socket) return;
     socket.off('player_moved');
     socket.off('room_update');
+    socket.off('you_were_hit');
+    socket.off('player_died');
+    socket.off('game_won');
   }
 }
 
