@@ -1049,12 +1049,10 @@ class GameScene extends Phaser.Scene {
       if (bullet.hitTargets.has(enemy.botId)) return;
       bullet.hitTargets.add(enemy.botId);
       enemy.health -= dmg;
-      this.tweens.add({targets:enemy,alpha:0.1,duration:60,yoyo:true});
       if (bullet.pierce <= 0) bullet.destroy(); else bullet.pierce--;
     } else {
       bullet.destroy();
       enemy.health -= dmg;
-      this.tweens.add({targets:enemy,alpha:0.1,duration:60,yoyo:true});
     }
     if (!enemy.active) return;
     if (enemy.health <= 0) {
@@ -1079,7 +1077,6 @@ class GameScene extends Phaser.Scene {
     const dmg = this.rangedDmg(bullet);
     bullet.destroy();
     this.player.health = Math.max(0, this.player.health - dmg);
-    this.tweens.add({targets:this.player,alpha:0.1,duration:80,yoyo:true});
     if (this.player.health === 0) this.endGame(false);
   }
 
@@ -1098,12 +1095,10 @@ class GameScene extends Phaser.Scene {
       if (bullet.hitTargets.has(enemy.botId)) return;
       bullet.hitTargets.add(enemy.botId);
       enemy.health -= dmg;
-      this.tweens.add({targets:enemy,alpha:0.1,duration:60,yoyo:true});
       if (bullet.pierce <= 0) bullet.destroy(); else bullet.pierce--;
     } else {
       bullet.destroy();
       enemy.health -= dmg;
-      this.tweens.add({targets:enemy,alpha:0.1,duration:60,yoyo:true});
     }
     if (!enemy.active) return;
     if (enemy.health <= 0) {
