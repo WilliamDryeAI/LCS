@@ -274,6 +274,7 @@ function drawBG(scene) {
   g.fillStyle(0x1a0033,0.4); g.fillCircle(W*0.15,H*0.25,110);
   g.fillStyle(0x001a33,0.4); g.fillCircle(W*0.85,H*0.75,95);
   g.fillStyle(0x1a1a00,0.3); g.fillCircle(W*0.6, H*0.2, 80);
+  return g;
 }
 
 function makeBtn(scene, x, y, w, h, label, color=0xee8800) {
@@ -648,62 +649,96 @@ class SettingsScene extends Phaser.Scene {
   constructor() { super('SettingsScene'); }
 
   create() {
-    drawBG(this);
-    header(this,'SETTINGS');
+    drawBG(this).setScrollFactor(0);
 
-    const rows=[
-      {label:'Music',         val:'ON',      color:0x334488},
-      {label:'Sound Effects', val:'ON',      color:0x334488},
-      {label:'Notifications', val:'OFF',     color:0x443322},
-      {label:'Language',      val:'English', color:0x334433},
-      {label:'Account',       val:'Guest',   color:0x443344},
+    const rows = [
+      { label:'Music',         val:'ON',      color:0x334488 },
+      { label:'Sound Effects', val:'ON',      color:0x334488 },
+      { label:'Notifications', val:'OFF',     color:0x443322 },
+      { label:'Language',      val:'English', color:0x334433 },
+      { label:'Account',       val:'Guest',   color:0x443344 },
     ];
-    const rw=Math.min(500,W-60), rh=50, sx=(W-rw)/2, sy=H*0.15;
-    rows.forEach((row,i)=>{
-      const y=sy+i*(rh+10);
-      const g=this.add.graphics();
-      g.fillStyle(row.color,0.85); g.fillRoundedRect(sx,y,rw,rh,10);
-      this.add.text(sx+18,y+rh/2,row.label,{fontSize:'16px',color:'#fff',stroke:'#000',strokeThickness:2}).setOrigin(0,0.5);
-      const vg=this.add.graphics();
-      vg.fillStyle(0x000000,0.3); vg.fillRoundedRect(sx+rw-112,y+(rh-30)/2,104,30,8);
-      this.add.text(sx+rw-60,y+rh/2,row.val,{fontSize:'14px',color:'#ffdd99',fontStyle:'bold'}).setOrigin(0.5);
+    const rw = Math.min(500, W-60), rh = 50, sx = (W-rw)/2;
+    let wy = H * 0.15;
+    const gap = rh + 12;
+
+    rows.forEach(row => {
+      const g = this.add.graphics();
+      g.fillStyle(row.color, 0.85); g.fillRoundedRect(sx, wy, rw, rh, 10);
+      this.add.text(sx+18, wy+rh/2, row.label, {
+        fontSize:'16px', color:'#fff', stroke:'#000', strokeThickness:2
+      }).setOrigin(0, 0.5);
+      const vg = this.add.graphics();
+      vg.fillStyle(0x000000, 0.3); vg.fillRoundedRect(sx+rw-112, wy+(rh-30)/2, 104, 30, 8);
+      this.add.text(sx+rw-60, wy+rh/2, row.val, {
+        fontSize:'14px', color:'#ffdd99', fontStyle:'bold'
+      }).setOrigin(0.5);
+      wy += gap;
     });
 
     // God Mode toggle
-    const godY = sy + rows.length*(rh+10) + 4;
+    wy += 4;
     let godOn = localStorage.getItem('br_godmode') === 'true';
-    const godBg  = this.add.graphics();
-    const godVal = this.add.text(sx+rw-60, godY+rh/2, godOn?'ON':'OFF', {
-      fontSize:'14px', color: godOn?'#44ff88':'#ffdd99', fontStyle:'bold'
+    const godBg = this.add.graphics();
+    const godVal = this.add.text(sx+rw-60, wy+rh/2, '', {
+      fontSize:'14px', fontStyle:'bold'
     }).setOrigin(0.5);
     const drawGod = () => {
       godBg.clear();
-      godBg.fillStyle(godOn?0x224422:0x442222, 0.9);
-      godBg.fillRoundedRect(sx, godY, rw, rh, 10);
-      godBg.lineStyle(2, godOn?0x44ff88:0x882222, 0.8);
-      godBg.strokeRoundedRect(sx, godY, rw, rh, 10);
-      godVal.setText(godOn?'ON':'OFF').setColor(godOn?'#44ff88':'#ff6666');
+      godBg.fillStyle(godOn ? 0x224422 : 0x442222, 0.9);
+      godBg.fillRoundedRect(sx, wy, rw, rh, 10);
+      godBg.lineStyle(2, godOn ? 0x44ff88 : 0x882222, 0.8);
+      godBg.strokeRoundedRect(sx, wy, rw, rh, 10);
+      godVal.setText(godOn ? 'ON' : 'OFF').setColor(godOn ? '#44ff88' : '#ff6666');
     };
     drawGod();
-    this.add.text(sx+18, godY+rh/2, '🧪 God Mode  (no damage taken)', {
+    this.add.text(sx+18, wy+rh/2, '🧪 God Mode  (no damage taken)', {
       fontSize:'15px', color:'#fff', stroke:'#000', strokeThickness:2
-    }).setOrigin(0,0.5);
-    godBg.setInteractive(new Phaser.Geom.Rectangle(sx,godY,rw,rh), Phaser.Geom.Rectangle.Contains);
-    godBg.on('pointerup', () => {
-      godOn = !godOn;
-      localStorage.setItem('br_godmode', godOn);
-      drawGod();
-    });
+    }).setOrigin(0, 0.5);
+    godBg.setInteractive(new Phaser.Geom.Rectangle(sx, wy, rw, rh), Phaser.Geom.Rectangle.Contains);
+    godBg.on('pointerup', () => { godOn = !godOn; localStorage.setItem('br_godmode', godOn); drawGod(); });
+    wy += gap;
 
-    // Reset save data button
-    const resetBtn = makeBtn(this, W/2, H-50, 200, 42, 'RESET SAVE DATA', 0x882222);
-    resetBtn.on('pointerup', () => {
-      localStorage.removeItem('br_coins');
-      localStorage.removeItem('br_unlocked');
-      this.scene.start('HomeScene');
-    });
+    // ── camera scroll setup ─────────────────────────────
+    const contentH = wy + 20;
+    const maxScrollY = Math.max(0, contentH - (H - 85));
+    this.cameras.main.setBounds(0, 0, W, Math.max(H, contentH + 80));
 
-    this.add.text(W/2,H-15,'Built with Phaser 3',{fontSize:'11px',color:'#444466'}).setOrigin(0.5);
+    let dragY = null, camY0 = 0, dragging = false;
+    this.input.on('pointerdown', p => {
+      dragY = p.y; camY0 = this.cameras.main.scrollY; dragging = false;
+    });
+    this.input.on('pointermove', p => {
+      if (!p.isDown || dragY === null) return;
+      const dy = p.y - dragY;
+      if (!dragging && Math.abs(dy) > 6) dragging = true;
+      if (dragging) this.cameras.main.setScrollY(Phaser.Math.Clamp(camY0 - dy, 0, maxScrollY));
+    });
+    this.input.on('pointerup', () => { dragY = null; dragging = false; });
+
+    // ── fixed header (covers content scrolling behind it) ──
+    this.add.graphics().setScrollFactor(0).setDepth(8)
+      .fillStyle(0x080818).fillRect(0, 0, W, H * 0.12);
+    this.add.text(W/2, 28, 'SETTINGS', {
+      fontSize:'26px', color:'#ffdd00', stroke:'#000000', strokeThickness:5, fontStyle:'bold'
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10);
+    makeBtn(this, 55, 28, 90, 38, '< BACK', 0x334466)
+      .setScrollFactor(0).setDepth(10)
+      .on('pointerup', () => this.scene.start('HomeScene'));
+
+    // ── fixed footer ────────────────────────────────────
+    this.add.graphics().setScrollFactor(0).setDepth(8)
+      .fillStyle(0x080818).fillRect(0, H-85, W, 85);
+    makeBtn(this, W/2, H-50, 200, 42, 'RESET SAVE DATA', 0x882222)
+      .setScrollFactor(0).setDepth(10)
+      .on('pointerup', () => {
+        localStorage.removeItem('br_coins');
+        localStorage.removeItem('br_unlocked');
+        this.scene.start('HomeScene');
+      });
+    this.add.text(W/2, H-15, 'Built with Phaser 3', {
+      fontSize:'11px', color:'#444466'
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10);
   }
 }
 
