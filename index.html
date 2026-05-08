@@ -99,6 +99,15 @@ const CHARS = [
     atk:{ angles:[-1.2,-0.72,-0.24,0.24,0.72,1.2], cooldown:1200, scale:0.9, speedMult:0.88, life:580 }
   },
   {
+    id:'sludge', name:'Sludge', tag:'Bog Slinger',
+    desc:'Fires sticky sludge that coats enemies on hit, halving their speed for 2 seconds. Hard to escape.',
+    color:0x336644, accent:0x77bb88, eye:0xffff44, bulletColor:0x55cc77,
+    rank:'Advanced', rankStars:2, rankColor:0x4499ff,
+    brawlerClass:'Controller', classColor:0x224433,
+    hp:3800, spd:200, dmg:480, cost:380,
+    atk:{ angles:[0], cooldown:780, scale:1.0, speedMult:0.95, life:950, slow:true }
+  },
+  {
     id:'lancer', name:'Lancer', tag:'Pierce Spear Fighter',
     desc:'Throws a spear that pierces through up to 2 enemies without stopping. Line up your shots.',
     color:0x884422, accent:0xddaa77, eye:0xffffff, bulletColor:0xffcc88,
@@ -115,6 +124,15 @@ const CHARS = [
     brawlerClass:'Fighter', classColor:0xaa8800,
     hp:3200, spd:240, dmg:620, cost:450,
     atk:{ angles:[-0.1,0.1], cooldown:450, scale:1.0, speedMult:1.3, life:1200 }
+  },
+  {
+    id:'ember', name:'Ember', tag:'Fire Zone Launcher',
+    desc:'Fires a flaming orb that ignites the ground on impact. Anyone caught in the blaze takes burn damage.',
+    color:0xcc4400, accent:0xff7722, eye:0xffffff, bulletColor:0xff5500,
+    rank:'Elite', rankStars:3, rankColor:0xcc66ff,
+    brawlerClass:'Trapper', classColor:0x882200,
+    hp:3000, spd:195, dmg:500, cost:470,
+    atk:{ angles:[0], cooldown:1500, scale:1.1, speedMult:1.0, life:1100, fireZone:true }
   },
   {
     id:'flame', name:'Flame', tag:'Short-Range Flamethrower',
@@ -136,12 +154,12 @@ const CHARS = [
   },
   {
     id:'hunter', name:'Hunter', tag:'Homing Missile Tracker',
-    desc:'Fires a missile that curves toward the nearest enemy. It will find its target.',
+    desc:'Fires a missile that aggressively curves toward the nearest enemy. Nearly impossible to dodge.',
     color:0x005577, accent:0x22aacc, eye:0xffffff, bulletColor:0x44ddff,
     rank:'Elite', rankStars:3, rankColor:0xcc66ff,
     brawlerClass:'Tracker', classColor:0x003355,
     hp:2800, spd:210, dmg:650, cost:530,
-    atk:{ angles:[0], cooldown:1400, scale:0.9, speedMult:1.2, life:1800, homing:true }
+    atk:{ angles:[0], cooldown:1400, scale:0.9, speedMult:1.2, life:1800, homing:true, homingRate:0.22 }
   },
   {
     id:'rex', name:'Rex', tag:'Grenade Launcher',
@@ -151,6 +169,15 @@ const CHARS = [
     brawlerClass:'Grenadier', classColor:0x552200,
     hp:3500, spd:185, dmg:700, cost:550,
     atk:{ angles:[0], cooldown:1600, scale:1.5, speedMult:0.8, life:1300, grenade:true }
+  },
+  {
+    id:'crunch', name:'Crunch', tag:'Double Impact Specialist',
+    desc:'Fires a quick small bullet immediately followed by a slow heavy cannonball. Both hitting together is devastating.',
+    color:0x334466, accent:0x6699cc, eye:0xff8800, bulletColor:0x88bbdd,
+    rank:'Elite', rankStars:3, rankColor:0xcc66ff,
+    brawlerClass:'Brawler', classColor:0x223355,
+    hp:4200, spd:185, dmg:680, cost:600,
+    atk:{ angles:[0], cooldown:1200, scale:0.55, speedMult:1.55, life:750, combo:true }
   },
   {
     id:'phantom', name:'Phantom', tag:'Double-Tap Marksman',
@@ -211,6 +238,11 @@ function buildTextures(scene) {
   t('shrapnel', 8, 8, g => {
     g.fillStyle(0xff6600); g.fillCircle(4,4,4);
     g.fillStyle(0xffaa44,0.6); g.fillCircle(3,3,2);
+  });
+  t('crunch_b_big', 22, 22, g => {
+    g.fillStyle(0x334466); g.fillCircle(11,11,11);
+    g.fillStyle(0x6699cc,0.85); g.fillCircle(11,11,7);
+    g.fillStyle(0xaaddff,0.5); g.fillCircle(9,9,4);
   });
 
   CHARS.forEach(c => {
@@ -759,6 +791,7 @@ class GameScene extends Phaser.Scene {
     this.isMP = this.registry.get('isMultiplayer') === true;
     this.remotePlayers = {};
     this.posTimer = 0;
+    this.fireZones = [];
 
     this.makeMap();
     this.makePlayer();
@@ -953,9 +986,26 @@ class GameScene extends Phaser.Scene {
       const x=b.x, y=b.y, dmg=b.damage, ownerId=b.ownerBotId??-1;
       b.destroy();
       this.spawnExplosion(x, y, dmg, isEnemy, ownerId);
+    } else if (b.fireZone) {
+      const x=b.x, y=b.y, dmg=b.damage, ownerId=b.ownerBotId??-1;
+      b.destroy();
+      this.spawnFireZone(x, y, dmg, isEnemy, ownerId);
     } else {
       b.destroy();
     }
+  }
+
+  spawnFireZone(x, y, dmg, isEnemy, ownerId) {
+    const radius = 55, duration = 2500, tickInterval = 420;
+    const tickDmg = Math.round(dmg * 0.18);
+    const gfx = this.add.graphics().setDepth(3);
+    const zone = { x, y, radius, gfx, tickDmg, isEnemy, ownerId,
+                   nextTick: this.time.now + tickInterval, tickInterval };
+    this.fireZones.push(zone);
+    this.time.delayedCall(duration, () => {
+      gfx.destroy();
+      this.fireZones = this.fireZones.filter(z => z !== zone);
+    });
   }
 
   spawnExplosion(x, y, dmg, isEnemy, ownerId) {
@@ -985,6 +1035,30 @@ class GameScene extends Phaser.Scene {
     const baseAng = Math.atan2(dy, dx);
     const spd = 640 * atk.speedMult;
 
+    if (atk.combo) {
+      const ang = baseAng;
+      const bx = x + Math.cos(ang)*30, by = y + Math.sin(ang)*30;
+      if (this.pointInWall(bx, by)) return;
+      const sb = this.pBullets.create(bx, by, id+'_b');
+      sb.setDepth(8).setScale(atk.scale);
+      sb.setVelocity(Math.cos(ang)*spd, Math.sin(ang)*spd);
+      sb.damage = Math.round(dmg * 0.3);
+      sb.birthTime = this.time.now; sb.maxLife = atk.life;
+      this.time.delayedCall(atk.life, ()=>{ if(sb?.active) sb.destroy(); });
+      this.time.delayedCall(270, () => {
+        if (!this.player?.active || this.gameOver) return;
+        const px = this.player.x + Math.cos(ang)*30, py = this.player.y + Math.sin(ang)*30;
+        if (this.pointInWall(px, py)) return;
+        const bb = this.pBullets.create(px, py, 'crunch_b_big');
+        bb.setDepth(8).setScale(1.0);
+        bb.setVelocity(Math.cos(ang)*spd*0.52, Math.sin(ang)*spd*0.52);
+        bb.damage = Math.round(dmg * 1.45);
+        bb.birthTime = this.time.now; bb.maxLife = 1350;
+        this.time.delayedCall(1350, ()=>{ if(bb?.active) bb.destroy(); });
+      });
+      return;
+    }
+
     atk.angles.forEach(offset => {
       const ang = baseAng + offset;
       const bx = x + Math.cos(ang) * 30;
@@ -996,10 +1070,17 @@ class GameScene extends Phaser.Scene {
       b.damage = dmg;
       b.birthTime = this.time.now; b.maxLife = atk.life;
       if (atk.rangeScale) b.rangeScale = true;
-      if (atk.grenade) b.grenade = true;
-      if (atk.homing)  b.homing  = true;
+      if (atk.grenade)   b.grenade = true;
+      if (atk.homing)  { b.homing = true; b.homingRate = atk.homingRate; }
+      if (atk.fireZone)  b.fireZone = true;
+      if (atk.slow)      b.slow = true;
       if (atk.pierce !== undefined) { b.pierce = atk.pierce; b.hitTargets = new Set(); b.setRotation(ang); }
-      this.time.delayedCall(atk.life, ()=>{ if(b?.active) b.destroy(); });
+      this.time.delayedCall(atk.life, ()=>{
+        if (b?.active) {
+          if (b.fireZone) this.spawnFireZone(b.x, b.y, b.damage, false, -1);
+          b.destroy();
+        }
+      });
     });
   }
 
@@ -1007,6 +1088,31 @@ class GameScene extends Phaser.Scene {
     const { atk, dmg, id } = eChar;
     const baseAng = Math.atan2(dy, dx);
     const spd = 640 * atk.speedMult;
+    const ownerId = owner?.botId ?? -1;
+
+    if (atk.combo) {
+      const ang = baseAng;
+      const bx = x + Math.cos(ang)*30, by = y + Math.sin(ang)*30;
+      if (this.pointInWall(bx, by)) return;
+      const sb = this.eBullets.create(bx, by, id+'_b');
+      sb.setDepth(8).setScale(atk.scale);
+      sb.setVelocity(Math.cos(ang)*spd, Math.sin(ang)*spd);
+      sb.damage = Math.round(dmg * 0.3); sb.ownerBotId = ownerId;
+      sb.birthTime = this.time.now; sb.maxLife = atk.life;
+      this.time.delayedCall(atk.life, ()=>{ if(sb?.active) sb.destroy(); });
+      this.time.delayedCall(270, () => {
+        if (!owner?.active) return;
+        const px = owner.x + Math.cos(ang)*30, py = owner.y + Math.sin(ang)*30;
+        if (this.pointInWall(px, py)) return;
+        const bb = this.eBullets.create(px, py, 'crunch_b_big');
+        bb.setDepth(8).setScale(1.0);
+        bb.setVelocity(Math.cos(ang)*spd*0.52, Math.sin(ang)*spd*0.52);
+        bb.damage = Math.round(dmg * 1.45); bb.ownerBotId = ownerId;
+        bb.birthTime = this.time.now; bb.maxLife = 1350;
+        this.time.delayedCall(1350, ()=>{ if(bb?.active) bb.destroy(); });
+      });
+      return;
+    }
 
     atk.angles.forEach(offset => {
       const ang = baseAng + offset;
@@ -1017,13 +1123,20 @@ class GameScene extends Phaser.Scene {
       b.setDepth(8).setScale(atk.scale);
       b.setVelocity(Math.cos(ang)*spd, Math.sin(ang)*spd);
       b.damage = dmg;
-      b.ownerBotId = owner?.botId ?? -1;
+      b.ownerBotId = ownerId;
       b.birthTime = this.time.now; b.maxLife = atk.life;
       if (atk.rangeScale) b.rangeScale = true;
-      if (atk.grenade) b.grenade = true;
-      if (atk.homing)  b.homing  = true;
+      if (atk.grenade)   b.grenade = true;
+      if (atk.homing)  { b.homing = true; b.homingRate = atk.homingRate; }
+      if (atk.fireZone)  b.fireZone = true;
+      if (atk.slow)      b.slow = true;
       if (atk.pierce !== undefined) { b.pierce = atk.pierce; b.hitTargets = new Set(); b.setRotation(ang); }
-      this.time.delayedCall(atk.life, ()=>{ if(b?.active) b.destroy(); });
+      this.time.delayedCall(atk.life, ()=>{
+        if (b?.active) {
+          if (b.fireZone) this.spawnFireZone(b.x, b.y, b.damage, true, ownerId);
+          b.destroy();
+        }
+      });
     });
   }
 
@@ -1049,10 +1162,14 @@ class GameScene extends Phaser.Scene {
       if (bullet.hitTargets.has(enemy.botId)) return;
       bullet.hitTargets.add(enemy.botId);
       enemy.health -= dmg;
+      if (bullet.slow) enemy.slowUntil = this.time.now + 2000;
+      if (bullet.fireZone) this.spawnFireZone(bullet.x, bullet.y, bullet.damage, false, -1);
       if (bullet.pierce <= 0) bullet.destroy(); else bullet.pierce--;
     } else {
+      if (bullet.fireZone) this.spawnFireZone(bullet.x, bullet.y, bullet.damage, false, -1);
       bullet.destroy();
       enemy.health -= dmg;
+      if (bullet.slow) enemy.slowUntil = this.time.now + 2000;
     }
     if (!enemy.active) return;
     if (enemy.health <= 0) {
@@ -1336,7 +1453,8 @@ class GameScene extends Phaser.Scene {
       const cAng = Math.atan2(b.body.velocity.y, b.body.velocity.x);
       const spd  = Math.hypot(b.body.velocity.x, b.body.velocity.y);
       const diff = Phaser.Math.Angle.Wrap(tAng - cAng);
-      const nAng = cAng + Phaser.Math.Clamp(diff, -0.07, 0.07);
+      const rate = b.homingRate || 0.07;
+      const nAng = cAng + Phaser.Math.Clamp(diff, -rate, rate);
       b.setVelocity(Math.cos(nAng)*spd, Math.sin(nAng)*spd);
     });
     this.eBullets.getChildren().forEach(b => {
@@ -1345,8 +1463,45 @@ class GameScene extends Phaser.Scene {
       const cAng = Math.atan2(b.body.velocity.y, b.body.velocity.x);
       const spd  = Math.hypot(b.body.velocity.x, b.body.velocity.y);
       const diff = Phaser.Math.Angle.Wrap(tAng - cAng);
-      const nAng = cAng + Phaser.Math.Clamp(diff, -0.07, 0.07);
+      const rate = b.homingRate || 0.07;
+      const nAng = cAng + Phaser.Math.Clamp(diff, -rate, rate);
       b.setVelocity(Math.cos(nAng)*spd, Math.sin(nAng)*spd);
+    });
+
+    // Fire zone animation and damage ticks
+    this.fireZones.forEach(zone => {
+      const phase = (time % 600) / 600;
+      zone.gfx.clear();
+      zone.gfx.fillStyle(0xff4400, 0.15 + 0.13 * Math.sin(phase * Math.PI * 2));
+      zone.gfx.fillCircle(zone.x, zone.y, zone.radius);
+      zone.gfx.fillStyle(0xff8800, 0.22 + 0.13 * Math.sin(phase * Math.PI * 2 + 1));
+      zone.gfx.fillCircle(zone.x, zone.y, zone.radius * 0.55);
+      zone.gfx.lineStyle(2, 0xff6600, 0.7);
+      zone.gfx.strokeCircle(zone.x, zone.y, zone.radius);
+      if (time < zone.nextTick) return;
+      zone.nextTick = time + zone.tickInterval;
+      if (!zone.isEnemy) {
+        this.enemies.getChildren().forEach(e => {
+          if (!e.active) return;
+          if (Phaser.Math.Distance.Between(zone.x, zone.y, e.x, e.y) < zone.radius) {
+            e.health -= zone.tickDmg;
+            if (e.health <= 0 && e.active) {
+              if (e.label) e.label.destroy();
+              e.destroy();
+              this.killCount++;
+              const left = this.enemies.getChildren().length;
+              this.cntLabel.setText('Enemies: '+left);
+              if (left === 0) this.endGame(true);
+            }
+          }
+        });
+      } else if (this.player?.active && !this.gameOver) {
+        if (localStorage.getItem('br_godmode') !== 'true' &&
+            Phaser.Math.Distance.Between(zone.x, zone.y, this.player.x, this.player.y) < zone.radius) {
+          this.player.health = Math.max(0, this.player.health - zone.tickDmg);
+          if (this.player.health === 0) this.endGame(false);
+        }
+      }
     });
 
     // Enemy AI
@@ -1363,7 +1518,8 @@ class GameScene extends Phaser.Scene {
       const dx = targetX - e.x, dy = targetY - e.y;
       const toTargetAng = Math.atan2(dy, dx);
       const hasLOS = !this.segmentHitsWall(e.x, e.y, targetX, targetY);
-      const eSpd = e.eChar.spd;
+      const eSpd = e.eChar.spd * (e.slowUntil > time ? 0.4 : 1);
+      if (e.slowUntil > time) e.setTint(0x44bbff); else e.clearTint();
 
       // Periodically shift wander direction
       if (time > e.wanderTimer) {
