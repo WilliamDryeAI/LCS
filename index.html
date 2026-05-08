@@ -90,6 +90,16 @@ const CHARS = [
     atk:{ angles:[-0.44,-0.22,0,0.22,0.44], cooldown:950, scale:0.85, speedMult:0.85, life:680 }
   },
   {
+    id:'thorn', name:'Thorn', tag:'Aura Brawler',
+    desc:'Surrounded by a damaging thorn ring. Enemies inside the aura take constant tick damage. Short-range bash on attack.',
+    color:0x336633, accent:0x88dd44, eye:0xff2200, bulletColor:0xaaff44,
+    rank:'Advanced', rankStars:2, rankColor:0x4499ff,
+    brawlerClass:'Brawler', classColor:0x224422,
+    hp:5500, spd:230, dmg:320, cost:280,
+    atk:{ angles:[0], cooldown:700, scale:1.2, speedMult:0.9, life:350,
+          aura:{ radius:100, dmg:85, tick:450 } }
+  },
+  {
     id:'nova', name:'Nova', tag:'Wide Burst Specialist',
     desc:'Unleashes 6 bullets in a massive fan covering the entire front arc. Deadly up close, nearly useless at range.',
     color:0xdd9900, accent:0xffdd44, eye:0xffffff, bulletColor:0xffcc00,
@@ -171,6 +181,15 @@ const CHARS = [
     atk:{ angles:[0], cooldown:1600, scale:1.5, speedMult:0.8, life:1300, grenade:true }
   },
   {
+    id:'rang', name:'Rang', tag:'Boomerang Archer',
+    desc:'Fires a boomerang that arcs out and returns. Damages enemies on both the outward trip and the return.',
+    color:0x995533, accent:0xddaa55, eye:0xffffff, bulletColor:0xffcc66,
+    rank:'Elite', rankStars:3, rankColor:0xcc66ff,
+    brawlerClass:'Fighter', classColor:0x773322,
+    hp:3200, spd:210, dmg:580, cost:560,
+    atk:{ angles:[0], cooldown:1100, scale:1.0, speedMult:1.3, life:1600, boomerang:true }
+  },
+  {
     id:'crunch', name:'Crunch', tag:'Double Impact Specialist',
     desc:'Fires a quick small bullet immediately followed by a slow heavy cannonball. Both hitting together is devastating.',
     color:0x334466, accent:0x6699cc, eye:0xff8800, bulletColor:0x88bbdd,
@@ -187,6 +206,15 @@ const CHARS = [
     brawlerClass:'Marksman', classColor:0x440099,
     hp:1700, spd:215, dmg:850, cost:650,
     atk:{ angles:[-0.06,0.06], cooldown:1600, scale:0.9, speedMult:1.7, life:1700 }
+  },
+  {
+    id:'arc', name:'Arc', tag:'Chain Lightning',
+    desc:'Fires a bolt that chains to nearby enemies on impact. Each bounce deals 70% of the previous hit.',
+    color:0x0044cc, accent:0x4488ff, eye:0xffff00, bulletColor:0x66aaff,
+    rank:'Ultimate', rankStars:4, rankColor:0xffdd00,
+    brawlerClass:'Mage', classColor:0x0022aa,
+    hp:2500, spd:225, dmg:700, cost:680,
+    atk:{ angles:[0], cooldown:800, scale:0.9, speedMult:1.4, life:900, chain:true }
   },
   {
     id:'shadow', name:'Shadow', tag:'Glass Cannon Assassin',
@@ -243,6 +271,17 @@ function buildTextures(scene) {
     g.fillStyle(0x334466); g.fillCircle(11,11,11);
     g.fillStyle(0x6699cc,0.85); g.fillCircle(11,11,7);
     g.fillStyle(0xaaddff,0.5); g.fillCircle(9,9,4);
+  });
+  t('rang_b', 20, 8, g => {
+    g.fillStyle(0xcc9933); g.fillRect(0,0,20,8);
+    g.fillStyle(0xffdd77); g.fillRect(2,1,16,6);
+    g.fillStyle(0xffeebb,0.6); g.fillRect(4,2,8,3);
+  });
+  t('arc_b', 14, 14, g => {
+    g.fillStyle(0x0044dd); g.fillCircle(7,7,7);
+    g.fillStyle(0x66aaff,0.85); g.fillCircle(7,7,5);
+    g.fillStyle(0xffffff,0.75); g.fillCircle(6,5,3);
+    g.lineStyle(1,0x88ccff,0.5); g.strokeCircle(7,7,7);
   });
 
   CHARS.forEach(c => {
@@ -792,6 +831,8 @@ class GameScene extends Phaser.Scene {
     this.remotePlayers = {};
     this.posTimer = 0;
     this.fireZones = [];
+    this.auraGfx  = this.ch.atk.aura ? this.add.graphics().setDepth(5) : null;
+    this.auraTick  = 0;
 
     this.makeMap();
     this.makePlayer();
@@ -1069,11 +1110,14 @@ class GameScene extends Phaser.Scene {
       b.setVelocity(Math.cos(ang)*spd, Math.sin(ang)*spd);
       b.damage = dmg;
       b.birthTime = this.time.now; b.maxLife = atk.life;
-      if (atk.rangeScale) b.rangeScale = true;
-      if (atk.grenade)   b.grenade = true;
-      if (atk.homing)  { b.homing = true; b.homingRate = atk.homingRate; }
-      if (atk.fireZone)  b.fireZone = true;
-      if (atk.slow)      b.slow = true;
+      if (atk.rangeScale)  b.rangeScale = true;
+      if (atk.grenade)     b.grenade = true;
+      if (atk.homing)    { b.homing = true; b.homingRate = atk.homingRate; }
+      if (atk.fireZone)    b.fireZone = true;
+      if (atk.slow)        b.slow = true;
+      if (atk.chain)     { b.chain = true; b.chainLeft = 3; b.chainHits = new Set(); }
+      if (atk.boomerang) { b.boomerang = true; b.returning = false;
+                           b.pierce = 20; b.hitTargets = new Set(); b.setRotation(ang); }
       if (atk.pierce !== undefined) { b.pierce = atk.pierce; b.hitTargets = new Set(); b.setRotation(ang); }
       this.time.delayedCall(atk.life, ()=>{
         if (b?.active) {
@@ -1125,11 +1169,13 @@ class GameScene extends Phaser.Scene {
       b.damage = dmg;
       b.ownerBotId = ownerId;
       b.birthTime = this.time.now; b.maxLife = atk.life;
-      if (atk.rangeScale) b.rangeScale = true;
-      if (atk.grenade)   b.grenade = true;
-      if (atk.homing)  { b.homing = true; b.homingRate = atk.homingRate; }
-      if (atk.fireZone)  b.fireZone = true;
-      if (atk.slow)      b.slow = true;
+      if (atk.rangeScale)  b.rangeScale = true;
+      if (atk.grenade)     b.grenade = true;
+      if (atk.homing)    { b.homing = true; b.homingRate = atk.homingRate; }
+      if (atk.fireZone)    b.fireZone = true;
+      if (atk.slow)        b.slow = true;
+      if (atk.boomerang) { b.boomerang = true; b.returning = false;
+                           b.pierce = 20; b.hitTargets = new Set(); b.setRotation(ang); }
       if (atk.pierce !== undefined) { b.pierce = atk.pierce; b.hitTargets = new Set(); b.setRotation(ang); }
       this.time.delayedCall(atk.life, ()=>{
         if (b?.active) {
@@ -1157,7 +1203,7 @@ class GameScene extends Phaser.Scene {
       return;
     }
     const dmg = this.rangedDmg(bullet);
-    if (bullet.pierce !== undefined) {
+    if (bullet.pierce !== undefined && !bullet.chain) {
       if (!bullet.hitTargets) bullet.hitTargets = new Set();
       if (bullet.hitTargets.has(enemy.botId)) return;
       bullet.hitTargets.add(enemy.botId);
@@ -1165,6 +1211,37 @@ class GameScene extends Phaser.Scene {
       if (bullet.slow) enemy.slowUntil = this.time.now + 2000;
       if (bullet.fireZone) this.spawnFireZone(bullet.x, bullet.y, bullet.damage, false, -1);
       if (bullet.pierce <= 0) bullet.destroy(); else bullet.pierce--;
+    } else if (bullet.chain) {
+      bullet.destroy();
+      enemy.health -= dmg;
+      const hitSet = new Set(bullet.chainHits || []);
+      hitSet.add(enemy.botId);
+      const chainLeft = bullet.chainLeft ?? 3;
+      if (chainLeft > 0) {
+        let nearE = null, nearD = 340;
+        this.enemies.getChildren().forEach(e => {
+          if (!e.active || hitSet.has(e.botId)) return;
+          const d = Phaser.Math.Distance.Between(enemy.x, enemy.y, e.x, e.y);
+          if (d < nearD) { nearD = d; nearE = e; }
+        });
+        if (nearE) {
+          const ang = Math.atan2(nearE.y - enemy.y, nearE.x - enemy.x);
+          const nb = this.pBullets.create(enemy.x, enemy.y, this.ch.id+'_b');
+          nb.setDepth(8).setScale(this.ch.atk.scale);
+          nb.setVelocity(Math.cos(ang)*640*this.ch.atk.speedMult, Math.sin(ang)*640*this.ch.atk.speedMult);
+          nb.damage = Math.round(dmg * 0.7);
+          nb.chain = true; nb.chainLeft = chainLeft - 1; nb.chainHits = hitSet;
+          nb.birthTime = this.time.now; nb.maxLife = 700;
+          this.time.delayedCall(700, ()=>{ if(nb?.active) nb.destroy(); });
+          const lx = this.add.graphics().setDepth(15);
+          lx.lineStyle(3, 0x88ccff, 1);
+          const mx = (enemy.x+nearE.x)/2 + Phaser.Math.Between(-20,20);
+          const my = (enemy.y+nearE.y)/2 + Phaser.Math.Between(-20,20);
+          lx.lineBetween(enemy.x, enemy.y, mx, my);
+          lx.lineBetween(mx, my, nearE.x, nearE.y);
+          this.time.delayedCall(120, ()=>lx.destroy());
+        }
+      }
     } else {
       if (bullet.fireZone) this.spawnFireZone(bullet.x, bullet.y, bullet.damage, false, -1);
       bullet.destroy();
@@ -1470,6 +1547,57 @@ class GameScene extends Phaser.Scene {
       b.setVelocity(Math.cos(nAng)*spd, Math.sin(nAng)*spd);
     });
 
+    // Boomerang bullet steering
+    this.pBullets.getChildren().forEach(b => {
+      if (!b.active || !b.boomerang) return;
+      b.setRotation(b.rotation + 0.25);
+      if (!b.returning && time - b.birthTime > b.maxLife * 0.5) {
+        b.returning = true;
+        b.setVelocity(-b.body.velocity.x * 0.9, -b.body.velocity.y * 0.9);
+        b.hitTargets = new Set();
+      }
+      if (b.returning && this.player?.active &&
+          Phaser.Math.Distance.Between(b.x, b.y, this.player.x, this.player.y) < 45) {
+        b.destroy();
+      }
+    });
+    this.eBullets.getChildren().forEach(b => {
+      if (!b.active || !b.boomerang) return;
+      b.setRotation(b.rotation + 0.25);
+      if (!b.returning && time - b.birthTime > b.maxLife * 0.5) {
+        b.returning = true;
+        b.setVelocity(-b.body.velocity.x * 0.9, -b.body.velocity.y * 0.9);
+      }
+    });
+
+    // Player damage aura (Thorn)
+    if (this.auraGfx && this.player?.active) {
+      const aura = this.ch.atk.aura;
+      const phase = (time % 700) / 700;
+      this.auraGfx.clear();
+      this.auraGfx.fillStyle(0x44ff00, 0.05 + 0.04 * Math.sin(phase * Math.PI * 2));
+      this.auraGfx.fillCircle(this.player.x, this.player.y, aura.radius);
+      this.auraGfx.lineStyle(3, 0x88ff44, 0.45 + 0.3 * Math.sin(phase * Math.PI * 2));
+      this.auraGfx.strokeCircle(this.player.x, this.player.y, aura.radius);
+      if (time > this.auraTick) {
+        this.auraTick = time + aura.tick;
+        this.enemies.getChildren().forEach(e => {
+          if (!e.active) return;
+          if (Phaser.Math.Distance.Between(this.player.x, this.player.y, e.x, e.y) < aura.radius) {
+            e.health -= aura.dmg;
+            if (e.health <= 0 && e.active) {
+              if (e.label) e.label.destroy();
+              e.destroy();
+              this.killCount++;
+              const left = this.enemies.getChildren().length;
+              this.cntLabel.setText('Enemies: '+left);
+              if (left === 0) this.endGame(true);
+            }
+          }
+        });
+      }
+    }
+
     // Fire zone animation and damage ticks
     this.fireZones.forEach(zone => {
       const phase = (time % 600) / 600;
@@ -1554,6 +1682,19 @@ class GameScene extends Phaser.Scene {
       }
       e.setVelocity(Math.cos(moveAng) * eSpd, Math.sin(moveAng) * eSpd);
       e.setRotation(hasLOS ? toTargetAng : moveAng);
+
+      // Bot aura (Thorn bots): damage player when close
+      if (e.eChar.atk.aura && !this.gameOver && this.player?.active) {
+        if (!e.nextAuraTick) e.nextAuraTick = time + e.eChar.atk.aura.tick;
+        if (time > e.nextAuraTick) {
+          e.nextAuraTick = time + e.eChar.atk.aura.tick;
+          if (localStorage.getItem('br_godmode') !== 'true' &&
+              Phaser.Math.Distance.Between(e.x, e.y, this.player.x, this.player.y) < e.eChar.atk.aura.radius) {
+            this.player.health = Math.max(0, this.player.health - e.eChar.atk.aura.dmg);
+            if (this.player.health === 0) this.endGame(false);
+          }
+        }
+      }
 
       // Only shoot when line-of-sight is clear
       const eCd = e.eChar.atk.cooldown;
