@@ -1365,8 +1365,10 @@ class GameScene extends Phaser.Scene {
       return;
     }
     const dmg = this.rangedDmg(bullet);
+    const isSlowBullet = bullet.slow;
     bullet.destroy();
     this.player.health = Math.max(0, this.player.health - dmg);
+    if (isSlowBullet) this.player.slowUntil = this.time.now + 3500;
     if (this.player.health === 0) this.endGame(false);
   }
 
@@ -1575,7 +1577,9 @@ class GameScene extends Phaser.Scene {
   update(time) {
     if (this.gameOver) return;
 
-    const spd = this.ch.spd;
+    const isSlowed = this.player.slowUntil > time;
+    const spd = this.ch.spd * (isSlowed ? 0.5 : 1);
+    if (isSlowed) this.player.setTint(0x44bbff); else this.player.clearTint();
     let vx=0, vy=0;
     const k = this.keys;
     if(k.left.isDown ||k.aLeft.isDown)  vx-=spd;
@@ -1607,7 +1611,7 @@ class GameScene extends Phaser.Scene {
     }
 
     // Shoot
-    const cd = this.ch.atk.cooldown;
+    const cd = this.ch.atk.cooldown * (isSlowed ? 2 : 1);
     if (this.fireBtn.on && time - this.lastShot > cd) {
       this.shootPlayer(this.player.x, this.player.y, this.lastFacing.x, this.lastFacing.y);
       this.lastShot = time;
@@ -1805,7 +1809,7 @@ class GameScene extends Phaser.Scene {
       }
 
       // Only shoot when line-of-sight is clear
-      const eCd = e.eChar.atk.cooldown;
+      const eCd = e.eChar.atk.cooldown * (e.slowUntil > time ? 2 : 1);
       if (hasLOS && nearestDist < 600 && time - e.lastShot > eCd) {
         const spread = Math.min(0.6, 0.1 + nearestDist / 1000);
         const aimAng = toTargetAng + (Math.random() - 0.5) * 2 * spread;
