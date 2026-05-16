@@ -225,6 +225,24 @@ const CHARS = [
     hp:2800, spd:265, dmg:1120, cost:700,
     atk:{ angles:[0], cooldown:300, scale:0.6, speedMult:1.7, life:800 }
   },
+  {
+    id:'basher', name:'Basher', tag:"Boulder's Brother",
+    desc:"Charges in and slams with a boulder-sized fist. Must close the distance to deal massive damage.",
+    color:0x555555, accent:0x333333, eye:0xff4400, bulletColor:0x999999,
+    rank:'Ultimate', rankStars:4, rankColor:0xffdd00,
+    brawlerClass:'Brawler', classColor:0x333333,
+    hp:7500, spd:255, dmg:1150, cost:680,
+    atk:{ angles:[0], cooldown:1100, scale:3.2, speedMult:0.28, life:360 }
+  },
+  {
+    id:'rico', name:'Rico', tag:'Ricochet Specialist',
+    desc:"Bullets bounce off walls up to 4 times, losing a little damage each bounce. Aim at angles to hit enemies around corners.",
+    color:0x22bb66, accent:0x88ffcc, eye:0xffff00, bulletColor:0x44ff99,
+    rank:'Ultimate', rankStars:4, rankColor:0xffdd00,
+    brawlerClass:'Trickster', classColor:0x118844,
+    hp:3200, spd:235, dmg:560, cost:700,
+    atk:{ angles:[0], cooldown:720, scale:0.9, speedMult:1.15, life:1800, ricochet:true, ricoBounces:4 }
+  },
 ];
 
 // ─────────────────────────────────────────────────────────
@@ -282,6 +300,19 @@ function buildTextures(scene) {
     g.fillStyle(0x66aaff,0.85); g.fillCircle(7,7,5);
     g.fillStyle(0xffffff,0.75); g.fillCircle(6,5,3);
     g.lineStyle(1,0x88ccff,0.5); g.strokeCircle(7,7,7);
+  });
+  t('basher_b', 20, 20, g => {
+    g.fillStyle(0x444444); g.fillCircle(10,10,10);
+    g.fillStyle(0x777777); g.fillCircle(10,10,7);
+    g.fillStyle(0x999999,0.7); g.fillCircle(7,7,4);
+    g.fillStyle(0x222222,0.6); g.fillCircle(13,13,3);
+    g.lineStyle(1,0xaaaaaa,0.5); g.strokeCircle(10,10,10);
+  });
+  t('rico_b', 14, 14, g => {
+    g.fillStyle(0x22bb66); g.fillCircle(7,7,7);
+    g.fillStyle(0x88ffcc,0.9); g.fillCircle(7,7,4);
+    g.fillStyle(0xffffff,0.8); g.fillCircle(5,5,2);
+    g.lineStyle(1,0x44ff99,0.9); g.strokeCircle(7,7,7);
   });
 
   CHARS.forEach(c => {
@@ -1242,6 +1273,24 @@ class GameScene extends Phaser.Scene {
       b.setVelocity(rvx / mag * spd, rvy / mag * spd);
       b.returning = true;
       b.hitTargets = new Set();
+    } else if (b.ricochet) {
+      if (b.bounces <= 0) { b.destroy(); return; }
+      const pvx = b._pvx ?? b.body.velocity.x;
+      const pvy = b._pvy ?? b.body.velocity.y;
+      const spd = Math.hypot(pvx, pvy) || 640;
+      let rvx = pvx, rvy = pvy;
+      if (b.body.blocked.left || b.body.blocked.right) rvx = -pvx;
+      else if (b.body.blocked.up || b.body.blocked.down) rvy = -pvy;
+      else { rvx = -pvx; rvy = -pvy; }
+      const mag = Math.hypot(rvx, rvy) || 1;
+      b.setVelocity(rvx / mag * spd, rvy / mag * spd);
+      b.bounces--;
+      b.damage = Math.round(b.damage * 0.85);
+      b.hitTargets = new Set();
+      const spark = this.add.graphics().setDepth(15);
+      spark.fillStyle(0x44ff99, 0.9); spark.fillCircle(b.x, b.y, 6);
+      spark.lineStyle(2, 0xffffff, 0.8); spark.strokeCircle(b.x, b.y, 9);
+      this.time.delayedCall(110, ()=>spark.destroy());
     } else {
       b.destroy();
     }
@@ -1366,6 +1415,7 @@ class GameScene extends Phaser.Scene {
       if (atk.boomerang) { b.boomerang = true; b.returning = false;
                            b.pierce = 20; b.hitTargets = new Set(); b.setRotation(ang); }
       if (atk.pierce !== undefined) { b.pierce = atk.pierce; b.hitTargets = new Set(); b.setRotation(ang); }
+      if (atk.ricochet) { b.ricochet = true; b.bounces = atk.ricoBounces || 4; b.hitTargets = new Set(); }
       this.time.delayedCall(atk.life, ()=>{
         if (b?.active) {
           if (b.grenade)  this.spawnExplosion(b.x, b.y, b.damage, false, -1);
@@ -1428,6 +1478,7 @@ class GameScene extends Phaser.Scene {
       if (atk.boomerang) { b.boomerang = true; b.returning = false;
                            b.pierce = 20; b.hitTargets = new Set(); b.setRotation(ang); }
       if (atk.pierce !== undefined) { b.pierce = atk.pierce; b.hitTargets = new Set(); b.setRotation(ang); }
+      if (atk.ricochet) { b.ricochet = true; b.bounces = atk.ricoBounces || 4; b.hitTargets = new Set(); }
       this.time.delayedCall(atk.life, ()=>{
         if (b?.active) {
           if (b.grenade)  this.spawnExplosion(b.x, b.y, b.damage, true, ownerId);
@@ -1447,6 +1498,7 @@ class GameScene extends Phaser.Scene {
     b.grenade = false; b.boomerang = false; b.returning = false;
     b.pierce = undefined; b.hitTargets = null; b.rpHitTargets = null;
     b.rangeScale = false; b.ownerBotId = undefined;
+    b.ricochet = false; b.bounces = 0;
   }
 
   rangedDmg(bullet) {
@@ -1471,6 +1523,12 @@ class GameScene extends Phaser.Scene {
       bullet.setVelocity(-bullet.body.velocity.x * 0.85, -bullet.body.velocity.y * 0.85);
       bullet.returning = true;
       bullet.hitTargets = new Set();
+    } else if (bullet.ricochet) {
+      if (!bullet.hitTargets) bullet.hitTargets = new Set();
+      if (bullet.hitTargets.has(enemy.botId)) return;
+      bullet.hitTargets.add(enemy.botId);
+      enemy.health -= dmg;
+      if (bullet.slow) enemy.slowUntil = this.time.now + 3500;
     } else if (bullet.pierce !== undefined && !bullet.chain) {
       if (!bullet.hitTargets) bullet.hitTargets = new Set();
       if (bullet.hitTargets.has(enemy.botId)) return;
@@ -1543,6 +1601,10 @@ class GameScene extends Phaser.Scene {
       bullet.setVelocity(-bullet.body.velocity.x * 0.85, -bullet.body.velocity.y * 0.85);
       bullet.returning = true;
       bullet.hitTargets = new Set();
+    } else if (bullet.ricochet) {
+      if (!bullet.hitTargets) bullet.hitTargets = new Set();
+      if (bullet.hitTargets.has('player')) return;
+      bullet.hitTargets.add('player');
     } else {
       if (bullet.fireZone) this.spawnFireZone(bullet.x, bullet.y, bullet.damage, true, bullet.ownerBotId ?? -1);
       bullet.destroy();
@@ -1569,6 +1631,11 @@ class GameScene extends Phaser.Scene {
       bullet.setVelocity(-bullet.body.velocity.x * 0.85, -bullet.body.velocity.y * 0.85);
       bullet.returning = true;
       bullet.hitTargets = new Set();
+    } else if (bullet.ricochet) {
+      if (!bullet.hitTargets) bullet.hitTargets = new Set();
+      if (bullet.hitTargets.has(enemy.botId)) return;
+      bullet.hitTargets.add(enemy.botId);
+      enemy.health -= dmg;
     } else if (bullet.pierce !== undefined) {
       if (!bullet.hitTargets) bullet.hitTargets = new Set();
       if (bullet.hitTargets.has(enemy.botId)) return;
@@ -1871,6 +1938,18 @@ class GameScene extends Phaser.Scene {
         b.returning = true;
         b.setVelocity(-b.body.velocity.x * 0.9, -b.body.velocity.y * 0.9);
       }
+    });
+
+    // Ricochet bullet pre-collision velocity tracking + spin
+    this.pBullets.getChildren().forEach(b => {
+      if (!b.active || !b.ricochet) return;
+      b._pvx = b.body.velocity.x; b._pvy = b.body.velocity.y;
+      b.setRotation(b.rotation + 0.18);
+    });
+    this.eBullets.getChildren().forEach(b => {
+      if (!b.active || !b.ricochet) return;
+      b._pvx = b.body.velocity.x; b._pvy = b.body.velocity.y;
+      b.setRotation(b.rotation + 0.18);
     });
 
     // Player damage aura (Thorn)
