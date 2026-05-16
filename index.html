@@ -1318,7 +1318,14 @@ class GameScene extends Phaser.Scene {
       return;
     }
     const dmg = this.rangedDmg(bullet);
-    if (bullet.pierce !== undefined && !bullet.chain) {
+    if (bullet.boomerang) {
+      if (!bullet.hitTargets) bullet.hitTargets = new Set();
+      if (bullet.hitTargets.has(enemy.botId)) return;
+      enemy.health -= dmg;
+      bullet.setVelocity(-bullet.body.velocity.x * 0.85, -bullet.body.velocity.y * 0.85);
+      bullet.returning = true;
+      bullet.hitTargets = new Set();
+    } else if (bullet.pierce !== undefined && !bullet.chain) {
       if (!bullet.hitTargets) bullet.hitTargets = new Set();
       if (bullet.hitTargets.has(enemy.botId)) return;
       bullet.hitTargets.add(enemy.botId);
@@ -1386,7 +1393,14 @@ class GameScene extends Phaser.Scene {
     }
     const dmg = this.rangedDmg(bullet);
     const isSlowBullet = bullet.slow;
-    bullet.destroy();
+    if (bullet.boomerang) {
+      bullet.setVelocity(-bullet.body.velocity.x * 0.85, -bullet.body.velocity.y * 0.85);
+      bullet.returning = true;
+      bullet.hitTargets = new Set();
+    } else {
+      if (bullet.fireZone) this.spawnFireZone(bullet.x, bullet.y, bullet.damage, true, bullet.ownerBotId ?? -1);
+      bullet.destroy();
+    }
     this.player.health = Math.max(0, this.player.health - dmg);
     if (isSlowBullet) this.player.slowUntil = this.time.now + 3500;
     if (this.player.health === 0) this.endGame(false);
@@ -1402,13 +1416,22 @@ class GameScene extends Phaser.Scene {
       return;
     }
     const dmg = this.rangedDmg(bullet);
-    if (bullet.pierce !== undefined) {
+    if (bullet.boomerang) {
+      if (!bullet.hitTargets) bullet.hitTargets = new Set();
+      if (bullet.hitTargets.has(enemy.botId)) return;
+      enemy.health -= dmg;
+      bullet.setVelocity(-bullet.body.velocity.x * 0.85, -bullet.body.velocity.y * 0.85);
+      bullet.returning = true;
+      bullet.hitTargets = new Set();
+    } else if (bullet.pierce !== undefined) {
       if (!bullet.hitTargets) bullet.hitTargets = new Set();
       if (bullet.hitTargets.has(enemy.botId)) return;
       bullet.hitTargets.add(enemy.botId);
       enemy.health -= dmg;
+      if (bullet.fireZone) this.spawnFireZone(bullet.x, bullet.y, bullet.damage, true, bullet.ownerBotId ?? -1);
       if (bullet.pierce <= 0) bullet.destroy(); else bullet.pierce--;
     } else {
+      if (bullet.fireZone) this.spawnFireZone(bullet.x, bullet.y, bullet.damage, true, bullet.ownerBotId ?? -1);
       bullet.destroy();
       enemy.health -= dmg;
     }
