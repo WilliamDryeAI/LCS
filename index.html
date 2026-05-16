@@ -1330,26 +1330,58 @@ class GameScene extends Phaser.Scene {
   }
 
   spawnExplosion(x, y, dmg, isEnemy, ownerId) {
-    const shrapDmg = Math.round(dmg * 0.35);
-    const life = 380;
-    const group = isEnemy ? this.eBullets : this.pBullets;
-    for (let i = 0; i < 8; i++) {
-      const ang = (i / 8) * Math.PI * 2;
-      const bx = x + Math.cos(ang)*14, by = y + Math.sin(ang)*14;
-      if (this.pointInWall(bx, by)) continue;
-      const s = group.create(bx, by, 'shrapnel');
-      this.resetBullet(s);
-      s.setDepth(8).setScale(0.9);
-      s.setVelocity(Math.cos(ang)*700, Math.sin(ang)*700);
-      s.damage = shrapDmg;
-      s.birthTime = this.time.now; s.maxLife = life;
-      if (isEnemy) s.ownerBotId = ownerId;
-      this.time.delayedCall(life, ()=>{ if(s?.active) s.destroy(); });
+    // Animated blast ring
+    const gfx = this.add.graphics().setDepth(20);
+    let frame = 0;
+    this.time.addEvent({ delay: 15, repeat: 14, callback: () => {
+      frame++;
+      const r = frame * 9;
+      const a = Math.max(0, 1 - frame / 14);
+      gfx.clear();
+      gfx.fillStyle(0xffee00, a * 0.9);  gfx.fillCircle(x, y, r * 0.4);
+      gfx.fillStyle(0xff8800, a * 0.75); gfx.fillCircle(x, y, r * 0.72);
+      gfx.fillStyle(0xff2200, a * 0.45); gfx.fillCircle(x, y, r);
+      gfx.lineStyle(3, 0xffcc00, a * 0.8); gfx.strokeCircle(x, y, r);
+      if (frame >= 14) gfx.destroy();
+    }});
+
+    // Instant area-of-effect damage within blast radius
+    const radius = 115;
+    const blastDmg = Math.round(dmg * 0.85);
+
+    const killCheck = e => {
+      if (!e.active || e.health > 0) return;
+      if (e.label) e.label.destroy();
+      e.destroy();
+      this.killCount++;
+      const left = this.enemies.getChildren().length;
+      this.cntLabel.setText('Enemies: ' + left);
+      if (left === 0 && !this.isMP) this.endGame(true);
+    };
+
+    if (!isEnemy) {
+      this.enemies.getChildren().forEach(e => {
+        if (!e.active) return;
+        if (Phaser.Math.Distance.Between(x, y, e.x, e.y) <= radius) {
+          e.health -= blastDmg;
+          killCheck(e);
+        }
+      });
+    } else {
+      if (this.player?.active && !this.gameOver &&
+          localStorage.getItem('br_godmode') !== 'true' &&
+          Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) <= radius) {
+        this.player.health = Math.max(0, this.player.health - blastDmg);
+        if (this.player.health === 0) this.endGame(false);
+      }
+      this.enemies.getChildren().forEach(e => {
+        if (!e.active || e.botId === ownerId) return;
+        if (Phaser.Math.Distance.Between(x, y, e.x, e.y) <= radius) {
+          e.health -= blastDmg;
+          killCheck(e);
+        }
+      });
     }
-    const flash = this.add.graphics().setDepth(20);
-    flash.fillStyle(0xff8800,0.85).fillCircle(x,y,44);
-    flash.fillStyle(0xffdd00,0.5).fillCircle(x,y,22);
-    this.time.delayedCall(140, ()=>flash.destroy());
   }
 
   shootPlayer(x, y, dx, dy) {
@@ -1405,6 +1437,7 @@ class GameScene extends Phaser.Scene {
       if (atk.pierce !== undefined) { b.pierce = atk.pierce; b.hitTargets = new Set(); b.setRotation(ang); }
       this.time.delayedCall(atk.life, ()=>{
         if (b?.active) {
+          if (b.grenade)  this.spawnExplosion(b.x, b.y, b.damage, false, -1);
           if (b.fireZone) this.spawnFireZone(b.x, b.y, b.damage, false, -1);
           b.destroy();
         }
@@ -1466,6 +1499,7 @@ class GameScene extends Phaser.Scene {
       if (atk.pierce !== undefined) { b.pierce = atk.pierce; b.hitTargets = new Set(); b.setRotation(ang); }
       this.time.delayedCall(atk.life, ()=>{
         if (b?.active) {
+          if (b.grenade)  this.spawnExplosion(b.x, b.y, b.damage, true, ownerId);
           if (b.fireZone) this.spawnFireZone(b.x, b.y, b.damage, true, ownerId);
           b.destroy();
         }
