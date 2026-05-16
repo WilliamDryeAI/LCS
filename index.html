@@ -722,18 +722,24 @@ class SettingsScene extends Phaser.Scene {
   create() {
     drawBG(this).setScrollFactor(0);
 
-    const rows = [
-      { label:'Music',         val:'ON',      color:0x334488 },
-      { label:'Sound Effects', val:'ON',      color:0x334488 },
-      { label:'Notifications', val:'OFF',     color:0x443322 },
-      { label:'Language',      val:'English', color:0x334433 },
-      { label:'Account',       val:'Guest',   color:0x443344 },
-    ];
     const rw = Math.min(500, W-60), rh = 50, sx = (W-rw)/2;
     let wy = H * 0.15;
     const gap = rh + 12;
 
-    rows.forEach(row => {
+    const sectionLabel = (text, y) => {
+      this.add.text(sx + 4, y, text, {
+        fontSize:'11px', color:'#8888aa', fontStyle:'bold', letterSpacing:2
+      });
+    };
+
+    // ── AUDIO section ────────────────────────────────────
+    sectionLabel('AUDIO', wy);
+    wy += 22;
+    const audioRows = [
+      { label:'Music',         val:'ON',      color:0x334488 },
+      { label:'Sound Effects', val:'ON',      color:0x334488 },
+    ];
+    audioRows.forEach(row => {
       const g = this.add.graphics();
       g.fillStyle(row.color, 0.85); g.fillRoundedRect(sx, wy, rw, rh, 10);
       this.add.text(sx+18, wy+rh/2, row.label, {
@@ -747,9 +753,34 @@ class SettingsScene extends Phaser.Scene {
       wy += gap;
     });
 
-    // God Mode toggle
-    wy += 4;
-    const godY = wy; // snapshot before wy mutates further
+    // ── GENERAL section ──────────────────────────────────
+    wy += 10;
+    sectionLabel('GENERAL', wy);
+    wy += 22;
+    const generalRows = [
+      { label:'Notifications', val:'OFF',     color:0x443322 },
+      { label:'Language',      val:'English', color:0x334433 },
+      { label:'Account',       val:'Guest',   color:0x443344 },
+    ];
+    generalRows.forEach(row => {
+      const g = this.add.graphics();
+      g.fillStyle(row.color, 0.85); g.fillRoundedRect(sx, wy, rw, rh, 10);
+      this.add.text(sx+18, wy+rh/2, row.label, {
+        fontSize:'16px', color:'#fff', stroke:'#000', strokeThickness:2
+      }).setOrigin(0, 0.5);
+      const vg = this.add.graphics();
+      vg.fillStyle(0x000000, 0.3); vg.fillRoundedRect(sx+rw-112, wy+(rh-30)/2, 104, 30, 8);
+      this.add.text(sx+rw-60, wy+rh/2, row.val, {
+        fontSize:'14px', color:'#ffdd99', fontStyle:'bold'
+      }).setOrigin(0.5);
+      wy += gap;
+    });
+
+    // ── DEVELOPER section ────────────────────────────────
+    wy += 10;
+    sectionLabel('DEVELOPER', wy);
+    wy += 22;
+    const godY = wy;
     let godOn = localStorage.getItem('br_godmode') === 'true';
     const godBg = this.add.graphics();
     const godVal = this.add.text(sx+rw-60, godY+rh/2, '', {
@@ -769,13 +800,39 @@ class SettingsScene extends Phaser.Scene {
     }).setOrigin(0, 0.5);
     godBg.setInteractive(new Phaser.Geom.Rectangle(sx, godY, rw, rh), Phaser.Geom.Rectangle.Contains);
     godBg.on('pointerup', () => { godOn = !godOn; localStorage.setItem('br_godmode', godOn); drawGod(); });
-    wy += gap;
+    wy += gap + 8;
+
+    // ── DATA section ─────────────────────────────────────
+    wy += 10;
+    sectionLabel('DATA', wy);
+    wy += 22;
+    makeBtn(this, W/2, wy + 21, Math.min(260, rw * 0.6), 42, 'RESET SAVE DATA', 0x882222)
+      .on('pointerup', () => {
+        localStorage.removeItem('br_coins');
+        localStorage.removeItem('br_unlocked');
+        this.scene.start('HomeScene');
+      });
+    wy += 42 + 40;
+
+    // ── version footer ───────────────────────────────────
+    this.add.text(W/2, wy, 'Last Circle Standing  v0.1', {
+      fontSize:'12px', color:'#555577'
+    }).setOrigin(0.5);
+    wy += 20;
+    this.add.text(W/2, wy, 'Built with Phaser 3', {
+      fontSize:'11px', color:'#444455'
+    }).setOrigin(0.5);
+    wy += 50;
 
     // ── camera scroll setup ─────────────────────────────
-    const contentH = wy + 20;
-    const maxScrollY = Math.max(0, contentH - (H - 85));
-    this.cameras.main.setBounds(0, 0, W, Math.max(H, contentH + 80));
+    const contentH = wy;
+    const headerH = H * 0.12 + 10;
+    const maxScrollY = Math.max(0, contentH - (H - headerH));
+    this.cameras.main.setBounds(0, 0, W, Math.max(H, contentH));
 
+    const clampScroll = v => Phaser.Math.Clamp(v, 0, maxScrollY);
+
+    // drag / touch scroll
     let dragY = null, camY0 = 0, dragging = false;
     this.input.on('pointerdown', p => {
       dragY = p.y; camY0 = this.cameras.main.scrollY; dragging = false;
@@ -784,9 +841,14 @@ class SettingsScene extends Phaser.Scene {
       if (!p.isDown || dragY === null) return;
       const dy = p.y - dragY;
       if (!dragging && Math.abs(dy) > 6) dragging = true;
-      if (dragging) this.cameras.main.setScrollY(Phaser.Math.Clamp(camY0 - dy, 0, maxScrollY));
+      if (dragging) this.cameras.main.setScrollY(clampScroll(camY0 - dy));
     });
     this.input.on('pointerup', () => { dragY = null; dragging = false; });
+
+    // mouse wheel / trackpad scroll
+    this.input.on('wheel', (_p, _objs, _dx, dy) => {
+      this.cameras.main.setScrollY(clampScroll(this.cameras.main.scrollY + dy * 0.6));
+    });
 
     // ── fixed header (covers content scrolling behind it) ──
     this.add.graphics().setScrollFactor(0).setDepth(8)
@@ -798,19 +860,6 @@ class SettingsScene extends Phaser.Scene {
       .setScrollFactor(0).setDepth(10)
       .on('pointerup', () => this.scene.start('HomeScene'));
 
-    // ── fixed footer ────────────────────────────────────
-    this.add.graphics().setScrollFactor(0).setDepth(8)
-      .fillStyle(0x080818).fillRect(0, H-85, W, 85);
-    makeBtn(this, W/2, H-50, 200, 42, 'RESET SAVE DATA', 0x882222)
-      .setScrollFactor(0).setDepth(10)
-      .on('pointerup', () => {
-        localStorage.removeItem('br_coins');
-        localStorage.removeItem('br_unlocked');
-        this.scene.start('HomeScene');
-      });
-    this.add.text(W/2, H-15, 'Built with Phaser 3', {
-      fontSize:'11px', color:'#444466'
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(10);
   }
 }
 
@@ -1085,6 +1134,7 @@ class GameScene extends Phaser.Scene {
       const bx = x + Math.cos(ang)*14, by = y + Math.sin(ang)*14;
       if (this.pointInWall(bx, by)) continue;
       const s = group.create(bx, by, 'shrapnel');
+      this.resetBullet(s);
       s.setDepth(8).setScale(0.9);
       s.setVelocity(Math.cos(ang)*700, Math.sin(ang)*700);
       s.damage = shrapDmg;
@@ -1108,6 +1158,7 @@ class GameScene extends Phaser.Scene {
       const bx = x + Math.cos(ang)*30, by = y + Math.sin(ang)*30;
       if (this.pointInWall(bx, by)) return;
       const sb = this.pBullets.create(bx, by, id+'_b');
+      this.resetBullet(sb);
       sb.setDepth(8).setScale(atk.scale);
       sb.setVelocity(Math.cos(ang)*spd, Math.sin(ang)*spd);
       sb.damage = Math.round(dmg * 0.3);
@@ -1118,6 +1169,7 @@ class GameScene extends Phaser.Scene {
         const px = this.player.x + Math.cos(ang)*30, py = this.player.y + Math.sin(ang)*30;
         if (this.pointInWall(px, py)) return;
         const bb = this.pBullets.create(px, py, 'crunch_b_big');
+        this.resetBullet(bb);
         bb.setDepth(8).setScale(1.0);
         bb.setVelocity(Math.cos(ang)*spd*0.52, Math.sin(ang)*spd*0.52);
         bb.damage = Math.round(dmg * 1.45);
@@ -1133,6 +1185,7 @@ class GameScene extends Phaser.Scene {
       const by = y + Math.sin(ang) * 30;
       if (this.pointInWall(bx, by)) return;
       const b = this.pBullets.create(bx, by, id+'_b');
+      this.resetBullet(b);
       b.setDepth(8).setScale(atk.scale);
       b.setVelocity(Math.cos(ang)*spd, Math.sin(ang)*spd);
       b.damage = dmg;
@@ -1166,6 +1219,7 @@ class GameScene extends Phaser.Scene {
       const bx = x + Math.cos(ang)*30, by = y + Math.sin(ang)*30;
       if (this.pointInWall(bx, by)) return;
       const sb = this.eBullets.create(bx, by, id+'_b');
+      this.resetBullet(sb);
       sb.setDepth(8).setScale(atk.scale);
       sb.setVelocity(Math.cos(ang)*spd, Math.sin(ang)*spd);
       sb.damage = Math.round(dmg * 0.3); sb.ownerBotId = ownerId;
@@ -1176,6 +1230,7 @@ class GameScene extends Phaser.Scene {
         const px = owner.x + Math.cos(ang)*30, py = owner.y + Math.sin(ang)*30;
         if (this.pointInWall(px, py)) return;
         const bb = this.eBullets.create(px, py, 'crunch_b_big');
+        this.resetBullet(bb);
         bb.setDepth(8).setScale(1.0);
         bb.setVelocity(Math.cos(ang)*spd*0.52, Math.sin(ang)*spd*0.52);
         bb.damage = Math.round(dmg * 1.45); bb.ownerBotId = ownerId;
@@ -1191,6 +1246,7 @@ class GameScene extends Phaser.Scene {
       const by = y + Math.sin(ang) * 30;
       if (this.pointInWall(bx, by)) return;
       const b = this.eBullets.create(bx, by, id+'_b');
+      this.resetBullet(b);
       b.setDepth(8).setScale(atk.scale);
       b.setVelocity(Math.cos(ang)*spd, Math.sin(ang)*spd);
       b.damage = dmg;
@@ -1214,6 +1270,15 @@ class GameScene extends Phaser.Scene {
   }
 
   // ─── HIT HANDLERS ────────────────────────────────────
+
+  resetBullet(b) {
+    b.chain = false; b.chainLeft = 0; b.chainHits = null;
+    b.fireZone = false; b.slow = false;
+    b.homing = false; b.homingRate = undefined;
+    b.grenade = false; b.boomerang = false; b.returning = false;
+    b.pierce = undefined; b.hitTargets = null; b.rpHitTargets = null;
+    b.rangeScale = false; b.ownerBotId = undefined;
+  }
 
   rangedDmg(bullet) {
     if (!bullet.rangeScale) return bullet.damage;
@@ -1254,6 +1319,7 @@ class GameScene extends Phaser.Scene {
         if (nearE) {
           const ang = Math.atan2(nearE.y - enemy.y, nearE.x - enemy.x);
           const nb = this.pBullets.create(enemy.x, enemy.y, this.ch.id+'_b');
+          this.resetBullet(nb);
           nb.setDepth(8).setScale(this.ch.atk.scale);
           nb.setVelocity(Math.cos(ang)*640*this.ch.atk.speedMult, Math.sin(ang)*640*this.ch.atk.speedMult);
           nb.damage = Math.round(dmg * 0.7);
@@ -1472,7 +1538,16 @@ class GameScene extends Phaser.Scene {
       this.worldHpGfx.fillStyle(col, 1);         this.worldHpGfx.fillRect(bx,by,bw*pct,bh);
     };
     bar(this.player.x, this.player.y, this.player.health, this.player.maxHealth);
-    this.enemies.getChildren().forEach(e => bar(e.x, e.y, e.health, e.maxHealth));
+    this.enemies.getChildren().forEach(e => {
+      bar(e.x, e.y, e.health, e.maxHealth);
+      if (e.active && e.eChar?.atk?.aura) {
+        const r = e.eChar.atk.aura.radius;
+        this.worldHpGfx.lineStyle(2, 0x88dd44, 0.5);
+        this.worldHpGfx.strokeCircle(e.x, e.y, r);
+        this.worldHpGfx.fillStyle(0x44ff00, 0.05);
+        this.worldHpGfx.fillCircle(e.x, e.y, r);
+      }
+    });
     Object.values(this.remotePlayers).forEach(rp => {
       if (rp.sprite?.active) bar(rp.sprite.x, rp.sprite.y, rp.hp, rp.maxHp);
     });
