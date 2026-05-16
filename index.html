@@ -822,13 +822,16 @@ class SettingsScene extends Phaser.Scene {
     this.add.text(W/2, wy, 'Built with Phaser 3', {
       fontSize:'11px', color:'#444455'
     }).setOrigin(0.5);
-    wy += 50;
+    wy += 30;
 
     // ── camera scroll setup ─────────────────────────────
-    const contentH = wy;
     const headerH = H * 0.12 + 10;
-    const maxScrollY = Math.max(0, contentH - (H - headerH));
-    this.cameras.main.setBounds(0, 0, W, Math.max(H, contentH));
+    const viewH = H - headerH;
+    // Guarantee at least 200px of scroll room on any screen size
+    const minContentH = viewH + 200;
+    const contentH = Math.max(wy, minContentH);
+    const maxScrollY = contentH - viewH;
+    this.cameras.main.setBounds(0, 0, W, contentH);
 
     const clampScroll = v => Phaser.Math.Clamp(v, 0, maxScrollY);
 
