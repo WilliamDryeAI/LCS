@@ -235,7 +235,7 @@ const CHARS = [
     atk:{ angles:[0], cooldown:1100, scale:3.2, speedMult:0.28, life:360 }
   },
   {
-    id:'rico', name:'Rico', tag:'Ricochet Specialist',
+    id:'bouncer', name:'Bouncer', tag:'Ricochet Specialist',
     desc:"Bullets bounce off walls up to 4 times, losing a little damage each bounce. Aim at angles to hit enemies around corners.",
     color:0x22bb66, accent:0x88ffcc, eye:0xffff00, bulletColor:0x44ff99,
     rank:'Ultimate', rankStars:4, rankColor:0xffdd00,
@@ -308,7 +308,7 @@ function buildTextures(scene) {
     g.fillStyle(0x222222,0.6); g.fillCircle(13,13,3);
     g.lineStyle(1,0xaaaaaa,0.5); g.strokeCircle(10,10,10);
   });
-  t('rico_b', 14, 14, g => {
+  t('bouncer_b', 14, 14, g => {
     g.fillStyle(0x22bb66); g.fillCircle(7,7,7);
     g.fillStyle(0x88ffcc,0.9); g.fillCircle(7,7,4);
     g.fillStyle(0xffffff,0.8); g.fillCircle(5,5,2);
