@@ -990,6 +990,13 @@ class GameScene extends Phaser.Scene {
       e.wanderTimer = 0;
       e.stuckTimer  = 0;
       e.lastPos     = { x, y };
+      e.combatAngle = Math.random() * Math.PI * 2;
+      e.combatTimer = 0;
+      // Preferred engagement distance derived from bullet range
+      const bRange = eChar.atk.aura ? 130
+        : 640 * eChar.atk.speedMult * eChar.atk.life / 1000;
+      e.preferDist = bRange < 450 ? 140 : bRange < 950 ? 290 : 460;
+      e.minDist    = bRange < 450 ?  65 : bRange < 950 ? 160 : 310;
 
       // Name tag floats above the bot
       e.label = this.add.text(x, y-50, eChar.name, {
@@ -1110,6 +1117,19 @@ class GameScene extends Phaser.Scene {
       const x=b.x, y=b.y, dmg=b.damage, ownerId=b.ownerBotId??-1;
       b.destroy();
       this.spawnFireZone(x, y, dmg, isEnemy, ownerId);
+    } else if (b.boomerang) {
+      // Reflect off wall using pre-collision velocity stored each frame
+      const pvx = b._pvx ?? b.body.velocity.x;
+      const pvy = b._pvy ?? b.body.velocity.y;
+      const spd = Math.hypot(pvx, pvy) || 640;
+      let rvx = pvx, rvy = pvy;
+      if (b.body.blocked.left || b.body.blocked.right) rvx = -pvx;
+      else if (b.body.blocked.up || b.body.blocked.down) rvy = -pvy;
+      else { rvx = -pvx; rvy = -pvy; }
+      const mag = Math.hypot(rvx, rvy) || 1;
+      b.setVelocity(rvx / mag * spd, rvy / mag * spd);
+      b.returning = true;
+      b.hitTargets = new Set();
     } else {
       b.destroy();
     }
@@ -1662,6 +1682,7 @@ class GameScene extends Phaser.Scene {
     // Boomerang bullet steering
     this.pBullets.getChildren().forEach(b => {
       if (!b.active || !b.boomerang) return;
+      b._pvx = b.body.velocity.x; b._pvy = b.body.velocity.y; // pre-collision snapshot
       b.setRotation(b.rotation + 0.25);
       if (!b.returning && time - b.birthTime > b.maxLife * 0.5) {
         b.returning = true;
@@ -1675,6 +1696,7 @@ class GameScene extends Phaser.Scene {
     });
     this.eBullets.getChildren().forEach(b => {
       if (!b.active || !b.boomerang) return;
+      b._pvx = b.body.velocity.x; b._pvy = b.body.velocity.y;
       b.setRotation(b.rotation + 0.25);
       if (!b.returning && time - b.birthTime > b.maxLife * 0.5) {
         b.returning = true;
@@ -1763,37 +1785,47 @@ class GameScene extends Phaser.Scene {
       const eSpd = e.eChar.spd * (e.slowUntil > time ? 0.2 : 1);
       if (e.slowUntil > time) e.setTint(0x44bbff); else e.clearTint();
 
-      // Periodically shift wander direction
+      // Periodically shift wander direction (used when no LOS)
       if (time > e.wanderTimer) {
         e.wanderAngle += (Math.random() - 0.5) * Math.PI * 1.5;
         e.wanderTimer = time + 1200 + Math.random() * 1800;
       }
 
-      // Stuck detection — if barely moving, break out with a new wander angle
+      // Stuck detection — nudge wander angle to break free
       const moved = Math.hypot(e.x - e.lastPos.x, e.y - e.lastPos.y);
       if (moved < 3) {
         e.stuckTimer++;
         if (e.stuckTimer > 25) {
           e.wanderAngle = toTargetAng + (Math.random() > 0.5 ? 1 : -1) * (0.9 + Math.random() * 0.7);
           e.wanderTimer = time + 600;
+          e.combatTimer = 0; // force combat direction recalc too
           e.stuckTimer  = 0;
         }
       } else { e.stuckTimer = 0; }
       e.lastPos = { x: e.x, y: e.y };
 
-      // Movement: navigate around walls, strafe in combat, wander when blocked
-      let moveAng;
-      if (!hasLOS) {
-        moveAng = e.wanderAngle; // wall in the way — navigate around it
-      } else if (nearestDist > 380) {
-        moveAng = toTargetAng + (Math.random() - 0.5) * 0.5; // close in loosely
-      } else if (nearestDist > 150) {
-        moveAng = toTargetAng + (Math.random() - 0.5) * 1.2; // strafe in combat
-      } else {
-        moveAng = toTargetAng + Math.PI + (Math.random() - 0.5) * 0.6; // back away
+      // Commit to a movement direction every ~300ms (eliminates per-frame jitter)
+      if (time > e.combatTimer) {
+        e.combatTimer = time + 260 + Math.random() * 140;
+        if (!hasLOS) {
+          e.combatAngle = e.wanderAngle;
+        } else if (nearestDist > e.preferDist * 1.4) {
+          // Far away — rush in directly
+          e.combatAngle = toTargetAng + (Math.random() - 0.5) * 0.2;
+        } else if (nearestDist > e.preferDist) {
+          // Closing in — slight strafe-approach
+          e.combatAngle = toTargetAng + (Math.random() - 0.5) * 0.5;
+        } else if (nearestDist > e.minDist) {
+          // In preferred range — circle-strafe perpendicular to target
+          const side = Math.random() > 0.5 ? 1 : -1;
+          e.combatAngle = toTargetAng + side * (Math.PI * 0.5 + (Math.random() - 0.5) * 0.35);
+        } else {
+          // Too close — back away
+          e.combatAngle = toTargetAng + Math.PI + (Math.random() - 0.5) * 0.35;
+        }
       }
-      e.setVelocity(Math.cos(moveAng) * eSpd, Math.sin(moveAng) * eSpd);
-      e.setRotation(hasLOS ? toTargetAng : moveAng);
+      e.setVelocity(Math.cos(e.combatAngle) * eSpd, Math.sin(e.combatAngle) * eSpd);
+      e.setRotation(hasLOS ? toTargetAng : e.combatAngle);
 
       // Bot aura (Thorn bots): damage player when close
       if (e.eChar.atk.aura && !this.gameOver && this.player?.active) {
@@ -1808,9 +1840,10 @@ class GameScene extends Phaser.Scene {
         }
       }
 
-      // Only shoot when line-of-sight is clear
+      // Only shoot when line-of-sight is clear and within effective range
       const eCd = e.eChar.atk.cooldown * (e.slowUntil > time ? 2 : 1);
-      if (hasLOS && nearestDist < 600 && time - e.lastShot > eCd) {
+      const shootRange = Math.min(680, Math.max(360, e.preferDist * 2));
+      if (hasLOS && nearestDist < shootRange && time - e.lastShot > eCd) {
         const spread = Math.min(0.6, 0.1 + nearestDist / 1000);
         const aimAng = toTargetAng + (Math.random() - 0.5) * 2 * spread;
         this.shootEnemy(e.x, e.y, Math.cos(aimAng), Math.sin(aimAng), e.eChar, e);
